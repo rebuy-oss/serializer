@@ -1,4 +1,4 @@
-# Liip Serializer - A fast JSON serializer
+# Rebuy Serializer - A fast JSON serializer
 
 > [!NOTE]
 > This project is based on the original work of [liip/serializer](https://github.com/liip/serializer). This repository is the actively maintained continuation of that project.
@@ -10,21 +10,21 @@ This serializer can convert between JSON and PHP objects and back. It uses refle
 If you customized JMS Serializer with your own listeners or similar things, this serializer will not work for you. We made an effort to detect when unsupported features are used and raise an error, but recommend that you double check whether the Liip Serializer really produces the exact same as JMS when transforming your data.
 
 # How it works
-The Liip Serializer generates PHP code based on the PHP models that you specify. It uses the flexible `liip/metadata-parser` to gather metadata on the models. A separate file is generated for every version and serializer groups combination to move all logic to the code generation step. This serializer is fast even for massive object trees because the generated PHP code is very simplistic and specific to the usecase, rather than the complex, flexible callback structure that JMS serializer uses. The project we developped this for often has data with up to a megabyte of compact JSON data.
+The Rebuy Serializer generates PHP code based on the PHP models that you specify. It uses the flexible `rebuy/metadata-parser` to gather metadata on the models. A separate file is generated for every version and serializer groups combination to move all logic to the code generation step. This serializer is fast even for massive object trees because the generated PHP code is very simplistic and specific to the usecase, rather than the complex, flexible callback structure that JMS serializer uses. The project we developped this for often has data with up to a megabyte of compact JSON data.
 
-You can use the Liip Serializer stand alone. If you are already working with
+You can use the Rebuy Serializer stand alone. If you are already working with
 JMS Serializer, you can also use the drop-in replacement for JMS serializer
-[liip/serializer-jms-adapter](https://github.com/liip/serializer-jms-adapter).
+[rebuy/serializer-jms-adapter](https://github.com/rebuy-oss/serializer-jms-adapter).
 The drop-in adapter implements the JMS interfaces and provides fallback to the
 regular JMS serializer for missing generated files and on other errors.
 
 # How to use it
 You need to generate converter files whenever your models change. They follow a
-naming scheme that allows the Liip Serializer to find them. Because the files
+naming scheme that allows the Rebuy Serializer to find them. Because the files
 have to be pre-generated, you need to specify the exact list of classes,
 serializer groups and versions you want to support.
 
-Note: We plan to create a Symfony bundle to integrate the Liip Serializer into
+Note: We plan to create a Symfony bundle to integrate the Rebuy Serializer into
 Symfony.
 
 ## Generate your files
@@ -250,7 +250,7 @@ $model = $serializer->deserialize($data, Product::class, 'json');
 
 ## Working with Arrays
 
-Like JMS Serializer, the Liip Serializer also provides `fromArray` and
+Like JMS Serializer, the Rebuy Serializer also provides `fromArray` and
 `toArray` for working with array data. As usual when using PHP arrays for JSON
 data, you will lose the distinction between empty array and empty object.
 

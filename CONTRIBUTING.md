@@ -1,4 +1,4 @@
-If you wish to contribute to Liip Serializer, feel free to do so. 
+If you wish to contribute to Rebuy Serializer, feel free to do so. 
 
 It is generally a good idea to open an issue before you create a Pull-Request to avoid wasting your time. That way the maintainers can ensure that the changes you want to make, is something that the project would welcome.
 

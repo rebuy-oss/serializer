@@ -6,16 +6,18 @@
     "authors": [
         {
             "name": "Liip AG",
-            "homepage": "http://www.liip.ch"
+            "homepage": "http://www.liip.ch",
+            "role": "Original Development (discontinued)"
         },
         {
             "name": "rebuy recommerce GmbH",
-            "homepage": "https://www.rebuy.com"
+            "homepage": "https://www.rebuy.com",
+            "role": "Maintainer"
         }
     ],
     "support": {
-        "source": "https://github.com/liip/serializer",
-        "issues": "https://github.com/liip/serializer/issues"
+        "source": "https://github.com/rebuy-oss/serializer",
+        "issues": "https://github.com/rebuy-oss/serializer/issues"
     },
     "require": {
         "php": "^8.1",

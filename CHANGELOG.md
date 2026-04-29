@@ -2,6 +2,14 @@
 
 # 3.x
 
+# 3.4.0 (unreleased)
+
+* Maintenance of this library has been taken over by rebuy. The package has been  renamed from  `liip/serializer`
+  to `rebuy/serializer`. The PHP namespace `Liip\Serializer` is kept unchanged for now to allow a smooth transition.
+
+  All entries below this version were released under the original `liip/serializer` package name and are kept here
+  for historical reference.
+
 # 3.3.0
 
 * Significant performance improvement when working with many objects of the same class.

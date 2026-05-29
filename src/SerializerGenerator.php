@@ -268,6 +268,9 @@ final readonly class SerializerGenerator
         array $stack,
     ): string {
         $index = '$index'.mb_strlen($arrayPath);
+        $value = '$value'.mb_strlen($arrayPath);
+        $itemArrayPath = $arrayPath.'['.$index.']';
+
         $subType = $type->getSubType();
 
         switch ($subType) {
@@ -277,15 +280,15 @@ final readonly class SerializerGenerator
                 return $this->templating->renderArrayAssign($arrayPath, $modelPath);
 
             case $subType instanceof PropertyTypeIterable:
-                $innerCode = $this->generateCodeForArray($subType, $apiVersion, $serializerGroups, $arrayPath.'['.$index.']', $modelPath.'['.$index.']', $stack);
+                $innerCode = $this->generateCodeForArray($subType, $apiVersion, $serializerGroups, $itemArrayPath, $value, $stack);
                 break;
 
             case $subType instanceof PropertyTypeEnum:
-                $innerCode = $this->generateCodeForFieldType($subType, $apiVersion, $serializerGroups, $arrayPath.'['.$index.']', $modelPath.'['.$index.']', $stack);
+                $innerCode = $this->generateCodeForFieldType($subType, $apiVersion, $serializerGroups, $itemArrayPath, $value, $stack);
                 break;
 
             case $subType instanceof PropertyTypeClass:
-                $innerCode = $this->generateCodeForClass($subType->getClassMetadata(), $apiVersion, $serializerGroups, $arrayPath.'['.$index.']', $modelPath.'['.$index.']', $stack);
+                $innerCode = $this->generateCodeForClass($subType->getClassMetadata(), $apiVersion, $serializerGroups, $itemArrayPath, $value, $stack);
                 break;
 
             default:
@@ -301,10 +304,10 @@ final readonly class SerializerGenerator
         }
 
         if ($type->isHashmap()) {
-            return $this->templating->renderLoopHashmap($arrayPath, $modelPath, $index, $innerCode);
+            return $this->templating->renderLoopHashmap($arrayPath, $modelPath, $index, $value, $innerCode);
         }
 
-        return $this->templating->renderLoopArray($arrayPath, $modelPath, $index, $innerCode);
+        return $this->templating->renderLoopArray($arrayPath, $modelPath, $index, $value, $innerCode);
     }
 
     /**

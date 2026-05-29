@@ -12,9 +12,9 @@ namespace Liip\Serializer\Exception;
  */
 final class UnsupportedTypeException extends Exception
 {
-    private const UNSUPPORTED_TYPE_DESERIALIZATION = 'Type "%s" is not known. This most likely means that you forgot to configure the generators to support this file, or that the generators did not run.';
+    private const string UNSUPPORTED_TYPE_DESERIALIZATION = 'Type "%s" is not known. This most likely means that you forgot to configure the generators to support this file, or that the generators did not run.';
 
-    private const UNSUPPORTED_TYPE_SERIALIZATION = 'Type "%s" is not known in version %s and groups %s. This most likely means that you forgot to configure the generators to support this file with the specific combination of version and groups, or that the generators did not run.';
+    private const string UNSUPPORTED_TYPE_SERIALIZATION = 'Type "%s" is not known in version %s and groups %s. This most likely means that you forgot to configure the generators to support this file with the specific combination of version and groups, or that the generators did not run.';
 
     public static function typeUnsupportedDeserialization(string $type): self
     {

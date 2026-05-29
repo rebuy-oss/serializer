@@ -1,5 +1,12 @@
 # Changelog
 
+# 4.x
+
+# 4.0.0 (unreleased)
+
+* Raise minium supported PHP version to `8.4.1`
+* Update to PHPUnit `13.1.x`
+
 # 3.x
 
 # 3.4.0

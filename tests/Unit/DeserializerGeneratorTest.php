@@ -13,6 +13,8 @@ use Liip\MetadataParser\ModelParser\PhpDocParser;
 use Liip\MetadataParser\ModelParser\ReflectionParser;
 use Liip\Serializer\DeserializerGenerator;
 use Liip\Serializer\Template\Deserialization;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Medium;
 use Tests\Liip\Serializer\Fixtures\BackedIntEnum;
 use Tests\Liip\Serializer\Fixtures\BackedStringEnum;
 use Tests\Liip\Serializer\Fixtures\ComplexUnionTyping;
@@ -40,9 +42,7 @@ use Tests\Liip\Serializer\Fixtures\UnitEnum;
 use Tests\Liip\Serializer\Fixtures\UnknownArraySubType;
 use Tests\Liip\Serializer\Fixtures\VirtualProperties;
 
-/**
- * @medium
- */
+#[Medium]
 class DeserializerGeneratorTest extends SerializerTestCase
 {
     private static Builder $metadataBuilder;
@@ -348,9 +348,7 @@ class DeserializerGeneratorTest extends SerializerTestCase
         self::assertSame('my-author', $model->property->name);
     }
 
-    /**
-     * @dataProvider providePrimitiveUnionDiscriminatorCases
-     */
+    #[DataProvider('providePrimitiveUnionDiscriminatorCases')]
     public function testPrimitiveUnionDiscriminator(mixed $propertyValue): void
     {
         $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_PrimitiveUnionTyping';

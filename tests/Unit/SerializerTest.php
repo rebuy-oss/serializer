@@ -9,15 +9,14 @@ use Liip\Serializer\Exception\Exception;
 use Liip\Serializer\Exception\UnsupportedFormatException;
 use Liip\Serializer\Exception\UnsupportedTypeException;
 use Liip\Serializer\Serializer;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\Small;
 use PHPUnit\Framework\TestCase;
 use Tests\Liip\Serializer\Fixtures\SerializerFailureModel;
 use Tests\Liip\Serializer\Fixtures\SerializerModel;
 
-/**
- * @small
- *
- * @runTestsInSeparateProcesses
- */
+#[Small]
+#[RunTestsInSeparateProcesses]
 class SerializerTest extends TestCase
 {
     public function testSerialize(): void

@@ -40,6 +40,6 @@ class Versions
      */
     public function getChangedInV3(): string
     {
-        return mb_strtoupper($this->changed);
+        return mb_strtoupper((string) $this->changed);
     }
 }

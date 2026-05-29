@@ -6,5 +6,5 @@ namespace Tests\Liip\Serializer\Fixtures;
 
 class PrimitiveUnionTyping
 {
-    public int|string|false|float|array|null $property;
+    public int|string|false|float|array|null $property = null;
 }

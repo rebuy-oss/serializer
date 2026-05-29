@@ -20,7 +20,7 @@
         "issues": "https://github.com/rebuy-oss/serializer/issues"
     },
     "require": {
-        "php": "^8.1",
+        "php": "^8.4.1",
         "ext-json": "*",
         "rebuy/metadata-parser": "^2.1.2",
         "pnz/json-exception": "^1.0",
@@ -33,10 +33,10 @@
         "doctrine/collections": "^1.6",
         "friendsofphp/php-cs-fixer": "^3.94.2",
         "jms/serializer": "^1.13 || ^2 || ^3",
-        "phpstan/phpstan": "^2.1.44",
+        "phpstan/phpstan": "^2.2.1",
         "phpstan/phpstan-phpunit": "^2.0.16",
-        "phpunit/phpunit": "^9.6",
-        "rector/rector": "^2.3.9"
+        "phpunit/phpunit": "^13.1.13",
+        "rector/rector": "^2.4.5"
     },
     "autoload": {
         "psr-4": {

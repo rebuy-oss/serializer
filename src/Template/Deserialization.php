@@ -7,9 +7,9 @@ namespace Liip\Serializer\Template;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
 
-final class Deserialization
+final readonly class Deserialization
 {
-    private const PRIMITIVE_CHECKS = [
+    private const array PRIMITIVE_CHECKS = [
         'null' => 'is_null({{value}})',
         'array' => 'is_array({{value}})',
         'int' => '(string) (int) {{value}} === (string) {{value}}',
@@ -20,7 +20,7 @@ final class Deserialization
         'string' => '!is_array({{value}}) && !is_object({{value}})',
     ];
 
-    private const PRIMITIVE_CASTS = [
+    private const array PRIMITIVE_CASTS = [
         'array' => '{{value}}',
         'int' => '(int) {{value}}',
         'float' => '(float) {{value}}',
@@ -28,7 +28,7 @@ final class Deserialization
         'string' => '(string) {{value}}',
     ];
 
-    private const TMPL_FUNCTION = <<<'EOT'
+    private const string TMPL_FUNCTION = <<<'EOT'
 <?php
 
 function {{functionName}}(array {{jsonPath}}): {{className}}
@@ -40,61 +40,61 @@ function {{functionName}}(array {{jsonPath}}): {{className}}
 
 EOT;
 
-    private const TMPL_CLASS = <<<'EOT'
+    private const string TMPL_CLASS = <<<'EOT'
 {{initArgumentsCode}}
 {{modelPath}} = new {{className}}({{arguments|join(', ')}});
 {{code}}
 
 EOT;
 
-    private const TMPL_ARGUMENT = <<<'EOT'
+    private const string TMPL_ARGUMENT = <<<'EOT'
 {{variableName}} = {{default}};
 {{code}}
 
 EOT;
 
-    private const TMPL_POST_METHOD = <<<'EOT'
+    private const string TMPL_POST_METHOD = <<<'EOT'
 {{modelPath}}->{{method}}();
 
 EOT;
 
-    private const TMPL_CONDITIONAL = <<<'EOT'
+    private const string TMPL_CONDITIONAL = <<<'EOT'
 if (isset({{data}})) {
     {{code}}
 }
 
 EOT;
 
-    private const TMPL_DISCRIMINATOR_CONDITIONAL = <<<'EOT'
+    private const string TMPL_DISCRIMINATOR_CONDITIONAL = <<<'EOT'
 if ({{jsonPath}} === '{{typeValue}}') {
     {{code}}
 }
 
 EOT;
 
-    private const TMPL_PRIMITIVE_CONDITIONAL = <<<'EOT'
+    private const string TMPL_PRIMITIVE_CONDITIONAL = <<<'EOT'
 if ({{typeConditional}}) {
     {{code}}
 } {% if withElseBlock %} else {% endif %}
 
 EOT;
 
-    private const TMPL_ASSIGN_JSON_DATA_TO_FIELD = <<<'EOT'
+    private const string TMPL_ASSIGN_JSON_DATA_TO_FIELD = <<<'EOT'
 {{modelPath}} = {{jsonPath}};
 
 EOT;
 
-    private const TMPL_ASSIGN_JSON_DATA_TO_FIELD_CASTING = <<<'EOT'
+    private const string TMPL_ASSIGN_JSON_DATA_TO_FIELD_CASTING = <<<'EOT'
 {{modelPath}} = ({{type}}) {{jsonPath}};
 
 EOT;
 
-    private const TMPL_ASSIGN_DATETIME_TO_FIELD = <<<'EOT'
+    private const string TMPL_ASSIGN_DATETIME_TO_FIELD = <<<'EOT'
 {{modelPath}} = new \DateTime({{jsonPath}});
 
 EOT;
 
-    private const TMPL_ASSIGN_DATETIME_FROM_FORMAT = <<<'EOT'
+    private const string TMPL_ASSIGN_DATETIME_FROM_FORMAT = <<<'EOT'
 {{date}} = false;
 foreach([{{formats|join(', ')}}] as {{format}}) {
     if (({{date}} = \DateTime::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
@@ -110,12 +110,12 @@ unset({{format}}, {{date}});
 
 EOT;
 
-    private const TMPL_ASSIGN_DATETIME_IMMUTABLE_TO_FIELD = <<<'EOT'
+    private const string TMPL_ASSIGN_DATETIME_IMMUTABLE_TO_FIELD = <<<'EOT'
 {{modelPath}} = new \DateTimeImmutable({{jsonPath}});
 
 EOT;
 
-    private const TMPL_ASSIGN_DATETIME_IMMUTABLE_FROM_FORMAT = <<<'EOT'
+    private const string TMPL_ASSIGN_DATETIME_IMMUTABLE_FROM_FORMAT = <<<'EOT'
 {{date}} = false;
 foreach([{{formats|join(', ')}}] as {{format}}) {
     if (({{date}} = \DateTimeImmutable::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
@@ -131,39 +131,39 @@ unset({{format}}, {{date}});
 
 EOT;
 
-    private const TMPL_ASSIGN_SETTER = <<<'EOT'
+    private const string TMPL_ASSIGN_SETTER = <<<'EOT'
 {{modelPath}}->{{method}}({{value}});
 
 EOT;
 
-    private const TMPL_INIT_ARRAY = <<<'EOT'
+    private const string TMPL_INIT_ARRAY = <<<'EOT'
 {{modelPath}} = [];
 
 EOT;
 
-    private const TMPL_LOOP = <<<'EOT'
+    private const string TMPL_LOOP = <<<'EOT'
 foreach (array_keys({{jsonPath}}) as {{indexVariable}}) {
     {{code}}
 }
 
 EOT;
 
-    private const TMPL_ARRAY_COLLECTION = <<<'EOT'
+    private const string TMPL_ARRAY_COLLECTION = <<<'EOT'
 {{modelPath}} = new \Doctrine\Common\Collections\ArrayCollection({{tmpVariable}});
 
 EOT;
 
-    private const TMPL_UNSET = <<<'EOT'
+    private const string TMPL_UNSET = <<<'EOT'
 unset({{variableNames|join(', ')}});
 
 EOT;
 
-    private const TMPL_ASSIGN_BACKED_ENUM = <<<'EOT'
+    private const string TMPL_ASSIGN_BACKED_ENUM = <<<'EOT'
 {{modelPath}} = {{enumClass}}::from({{jsonPath}});
 
 EOT;
 
-    private const TMPL_ASSIGN_UNIT_ENUM = <<<'EOT'
+    private const string TMPL_ASSIGN_UNIT_ENUM = <<<'EOT'
 {{modelPath}} = (static function (string $n): {{enumClass}} {
     foreach ({{enumClass}}::cases() as $case) {
         if ($case->name === $n) {
@@ -175,9 +175,9 @@ EOT;
 
 EOT;
 
-    private const TMPL_EXTRACT = '{{jsonPath}} ?? {{default}}';
+    private const string TMPL_EXTRACT = '{{jsonPath}} ?? {{default}}';
 
-    private const TMPL_CREATE_OBJECT = 'new {{className}}({{arguments|join(\', \')}})';
+    private const string TMPL_CREATE_OBJECT = 'new {{className}}({{arguments|join(\', \')}})';
 
     private Environment $twig;
 

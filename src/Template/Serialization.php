@@ -7,9 +7,9 @@ namespace Liip\Serializer\Template;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
 
-final class Serialization
+final readonly class Serialization
 {
-    private const TMPL_FUNCTION = <<<'EOT'
+    private const string TMPL_FUNCTION = <<<'EOT'
 <?php
 
 function {{functionName}}({{className}} $model, bool $useStdClass = true)
@@ -32,7 +32,7 @@ function {{functionName}}({{className}} $model, bool $useStdClass = true)
 
 EOT;
 
-    private const TMPL_CLASS = <<<'EOT'
+    private const string TMPL_CLASS = <<<'EOT'
 $jsonData{{jsonPath}} = [];
 {{code}}
 if (0 === \count($jsonData{{jsonPath}})) {
@@ -41,37 +41,37 @@ if (0 === \count($jsonData{{jsonPath}})) {
 
 EOT;
 
-    private const TMPL_CONDITIONAL = <<<'EOT'
+    private const string TMPL_CONDITIONAL = <<<'EOT'
 if (null !== {{condition}}) {
     {{code}}
 }
 
 EOT;
 
-    private const TMPL_INSTANCE_OF_CONDITIONAL = <<<'EOT'
+    private const string TMPL_INSTANCE_OF_CONDITIONAL = <<<'EOT'
 if ({{propertyAccessor}} instanceof {{class}}) {
     {{code}}
 }
 
 EOT;
 
-    private const TMPL_PRIMITIVE_CONDITIONAL = <<<'EOT'
+    private const string TMPL_PRIMITIVE_CONDITIONAL = <<<'EOT'
 if ($isPrimitive({{propertyAccessor}})) {
     {{code}}
 }
 EOT;
 
-    private const TMPL_ARRAY_CONDITIONAL = <<<'EOT'
+    private const string TMPL_ARRAY_CONDITIONAL = <<<'EOT'
 if (is_array({{propertyAccessor}})) {
     {{code}}
 }
 EOT;
 
-    private const TMPL_ASSIGN = <<<'EOT'
+    private const string TMPL_ASSIGN = <<<'EOT'
 $jsonData{{jsonPath}} = {{propertyAccessor}};
 EOT;
 
-    private const TMPL_ARRAY_ASSIGN = <<<'EOT'
+    private const string TMPL_ARRAY_ASSIGN = <<<'EOT'
 if ({{propertyAccessor}} instanceof \Doctrine\Common\Collections\Collection) {
     $jsonData{{jsonPath}} = {{propertyAccessor}}->toArray();
 } else {
@@ -79,7 +79,7 @@ if ({{propertyAccessor}} instanceof \Doctrine\Common\Collections\Collection) {
 }
 EOT;
 
-    private const TMPL_LOOP_ARRAY = <<<'EOT'
+    private const string TMPL_LOOP_ARRAY = <<<'EOT'
 {{indexVariable}}Array = {{propertyAccessor}};
 if ({{propertyAccessor}} instanceof \Doctrine\Common\Collections\Collection) {
     {{indexVariable}}Array = {{propertyAccessor}}->toArray();
@@ -92,12 +92,12 @@ foreach (array_keys({{indexVariable}}Array) as {{indexVariable}}) {
 
 EOT;
 
-    private const TMPL_LOOP_ARRAY_EMPTY = <<<'EOT'
+    private const string TMPL_LOOP_ARRAY_EMPTY = <<<'EOT'
 $jsonData{{jsonPath}} = [];
 
 EOT;
 
-    private const TMPL_LOOP_HASHMAP = <<<'EOT'
+    private const string TMPL_LOOP_HASHMAP = <<<'EOT'
 if (0 === \count({{propertyAccessor}})) {
     $jsonData{{jsonPath}} = $emptyHashmap;
 } else {
@@ -113,11 +113,11 @@ if (0 === \count({{propertyAccessor}})) {
 
 EOT;
 
-    private const TMPL_GETTER = '{{modelPath}}->{{method}}()';
+    private const string TMPL_GETTER = '{{modelPath}}->{{method}}()';
 
-    private const TMPL_DATETIME = '{{propertyPath}}->format(\'{{format}}\');';
+    private const string TMPL_DATETIME = '{{propertyPath}}->format(\'{{format}}\');';
 
-    private const TMPL_TEMP_VAR = '${{name}} = {{value}}';
+    private const string TMPL_TEMP_VAR = '${{name}} = {{value}}';
 
     private Environment $twig;
 

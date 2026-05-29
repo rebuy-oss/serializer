@@ -23,9 +23,9 @@ use Liip\Serializer\Path\ModelPath;
 use Liip\Serializer\Template\Deserialization;
 use Symfony\Component\Filesystem\Filesystem;
 
-final class DeserializerGenerator
+final readonly class DeserializerGenerator
 {
-    private const FILENAME_PREFIX = 'deserialize';
+    private const string FILENAME_PREFIX = 'deserialize';
 
     private Filesystem $filesystem;
 
@@ -289,9 +289,7 @@ final class DeserializerGenerator
         $code = '';
 
         $types = $type->getTypes();
-        $typesWithoutPrimitives = array_filter($types, static function (PropertyType $subType): bool {
-            return !($subType instanceof PropertyTypePrimitive || $subType instanceof PropertyTypeIterable);
-        });
+        $typesWithoutPrimitives = array_filter($types, static fn (PropertyType $subType): bool => !($subType instanceof PropertyTypePrimitive || $subType instanceof PropertyTypeIterable));
 
         $fieldName = $type->getFieldName();
         if (null !== $fieldName) {

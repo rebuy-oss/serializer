@@ -16,9 +16,19 @@ use Pnz\JsonException\Json;
  *
  * The code generation is - at least for now - only implemented for JSON.
  */
-final readonly class Serializer implements SerializerInterface
+final class Serializer implements SerializerInterface
 {
-    public function __construct(private string $cacheDirectory)
+    /**
+     * @var array<string, callable>
+     */
+    private array $serializerFunctionNames = [];
+
+    /**
+     * @var array<string, callable>
+     */
+    private array $deserializerFunctionNames = [];
+
+    public function __construct(private readonly string $cacheDirectory)
     {
     }
 
@@ -93,9 +103,10 @@ final readonly class Serializer implements SerializerInterface
             throw new Exception('Version and group support is not implemented for deserialization. It is only supported for serialization');
         }
 
-        $functionName = DeserializerGenerator::buildDeserializerFunctionName($type);
+        $functionName = $this->deserializerFunctionNames[$type] ?? null;
 
-        if (!\function_exists($functionName)) {
+        if (null === $functionName) {
+            $functionName = DeserializerGenerator::buildDeserializerFunctionName($type);
             $filename = \sprintf('%s/%s.php', $this->cacheDirectory, $functionName);
             if (!file_exists($filename)) {
                 throw UnsupportedTypeException::typeUnsupportedDeserialization($type);
@@ -103,10 +114,11 @@ final readonly class Serializer implements SerializerInterface
 
             require_once $filename;
 
-            /* @phpstan-ignore booleanNot.alwaysTrue */
             if (!\function_exists($functionName)) {
                 throw new Exception(\sprintf('Internal Error: Deserializer for %s in file %s does not have expected function %s', $type, $filename, $functionName));
             }
+
+            $this->deserializerFunctionNames[$type] = $functionName;
         }
 
         try {
@@ -134,9 +146,11 @@ final readonly class Serializer implements SerializerInterface
             }
         }
 
-        $functionName = SerializerGenerator::buildSerializerFunctionName($type, $version, $groups);
+        $cacheKey = $type.'|'.$version.'|'.implode(',', $groups);
+        $functionName = $this->serializerFunctionNames[$cacheKey] ?? null;
 
-        if (!\function_exists($functionName)) {
+        if (null === $functionName) {
+            $functionName = SerializerGenerator::buildSerializerFunctionName($type, $version, $groups);
             $filename = \sprintf('%s/%s.php', $this->cacheDirectory, $functionName);
             if (!file_exists($filename)) {
                 throw UnsupportedTypeException::typeUnsupportedSerialization($type, $version, $groups);
@@ -144,10 +158,11 @@ final readonly class Serializer implements SerializerInterface
 
             require_once $filename;
 
-            /* @phpstan-ignore booleanNot.alwaysTrue */
             if (!\function_exists($functionName)) {
                 throw new Exception(\sprintf('Internal Error: Serializer for %s in file %s does not have expected function %s', $type, $filename, $functionName));
             }
+
+            $this->serializerFunctionNames[$cacheKey] = $functionName;
         }
 
         try {

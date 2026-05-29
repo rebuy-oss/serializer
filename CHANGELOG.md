@@ -6,6 +6,8 @@
 
 * Raise minium supported PHP version to `8.4.1`
 * Update to PHPUnit `13.1.x`
+* Add `phpbench/phpbench` and some benchmarks
+* Improve performance of (de)serialization by adjusting the generated code a bit
 
 # 3.x
 

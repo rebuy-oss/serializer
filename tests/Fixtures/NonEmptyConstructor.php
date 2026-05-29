@@ -8,21 +8,21 @@ use JMS\Serializer\Annotation as Serializer;
 
 class NonEmptyConstructor
 {
-    private const FOOBAR = 'bar';
+    private const string FOOBAR = 'bar';
 
     public function __construct(
         /**
          * @Serializer\Type("string")
          */
-        private string $apiString,
+        private readonly string $apiString,
         /**
          * @Serializer\Exclude
          */
-        private array $onlyArgument = ['foo', self::FOOBAR],
+        private readonly array $onlyArgument = ['foo', self::FOOBAR],
         /**
          * @Serializer\Type("string")
          */
-        private string $optional = 'optional',
+        private readonly string $optional = 'optional',
     ) {
     }
 

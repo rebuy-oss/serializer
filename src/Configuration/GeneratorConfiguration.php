@@ -27,7 +27,7 @@ class GeneratorConfiguration implements \IteratorAggregate
      *
      * @var list<list<string>>
      */
-    private array $defaultGroupCombinations;
+    private readonly array $defaultGroupCombinations;
 
     /**
      * List of versions to generate. An empty string '' means to generate without a version.
@@ -35,7 +35,7 @@ class GeneratorConfiguration implements \IteratorAggregate
      *
      * @var list<string>
      */
-    private array $defaultVersions;
+    private readonly array $defaultVersions;
 
     /**
      * @var ClassToGenerate[]
@@ -55,7 +55,7 @@ class GeneratorConfiguration implements \IteratorAggregate
     public function __construct(array $defaultGroupCombinations, array $defaultVersions, array $options = [])
     {
         $this->defaultGroupCombinations = $defaultGroupCombinations ?: [[]];
-        $this->defaultVersions = array_map('strval', $defaultVersions) ?: [''];
+        $this->defaultVersions = array_map(strval(...), $defaultVersions) ?: [''];
         $this->options = $this->resolveOptions($options);
     }
 
@@ -211,12 +211,6 @@ class GeneratorConfiguration implements \IteratorAggregate
      */
     private function supportsClass(array $supportedClasses, string $actualClass): bool
     {
-        foreach ($supportedClasses as $supportedClass) {
-            if (is_a($actualClass, $supportedClass, true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($supportedClasses, static fn ($supportedClass): bool => is_a($actualClass, $supportedClass, true));
     }
 }

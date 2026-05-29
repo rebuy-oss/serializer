@@ -25,18 +25,18 @@ class ClassToGenerate implements \IteratorAggregate
      *
      * @var list<string>|null
      */
-    private ?array $defaultVersions;
+    private readonly ?array $defaultVersions;
 
     /**
      * @param class-string          $className
      * @param list<string|int>|null $defaultVersions
      */
     public function __construct(
-        private GeneratorConfiguration $configuration,
-        private string $className,
+        private readonly GeneratorConfiguration $configuration,
+        private readonly string $className,
         ?array $defaultVersions = null,
     ) {
-        $this->defaultVersions = null === $defaultVersions ? null : array_map('strval', $defaultVersions);
+        $this->defaultVersions = null === $defaultVersions ? null : array_map(strval(...), $defaultVersions);
     }
 
     public function getClassName(): string

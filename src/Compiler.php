@@ -6,7 +6,7 @@ namespace Liip\Serializer;
 
 use Liip\MetadataParser\Builder;
 
-final class Compiler
+final readonly class Compiler
 {
     public function __construct(
         private Builder $metadataBuilder,

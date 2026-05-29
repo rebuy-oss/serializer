@@ -10,7 +10,7 @@ class GroupCombination
      * @param list<string>|null $versions
      */
     public function __construct(
-        private ClassToGenerate $containingClass,
+        private readonly ClassToGenerate $containingClass,
         /**
          * @var list<string> One combination of groups to generate.
          *                   An empty array means to generate with no groups.
@@ -27,7 +27,7 @@ class GroupCombination
          * If not specified, this falls back to the class default.
          * If the array is not null, it must have a length > 0.
          */
-        private ?array $versions = null,
+        private readonly ?array $versions = null,
     ) {
         sort($this->groups);
 

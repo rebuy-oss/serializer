@@ -23,9 +23,9 @@ use Liip\Serializer\Configuration\GeneratorConfiguration;
 use Liip\Serializer\Template\Serialization;
 use Symfony\Component\Filesystem\Filesystem;
 
-final class SerializerGenerator
+final readonly class SerializerGenerator
 {
-    private const FILENAME_PREFIX = 'serialize';
+    private const string FILENAME_PREFIX = 'serialize';
 
     private Filesystem $filesystem;
 
@@ -322,9 +322,7 @@ final class SerializerGenerator
         $code = '';
 
         $types = $subType->getTypes();
-        $typesWithoutPrimitives = array_filter($types, static function (PropertyType $subType): bool {
-            return !($subType instanceof PropertyTypePrimitive || $subType instanceof PropertyTypeUnknown);
-        });
+        $typesWithoutPrimitives = array_filter($types, static fn (PropertyType $subType): bool => !($subType instanceof PropertyTypePrimitive || $subType instanceof PropertyTypeUnknown));
 
         $hasPrimitives = \count($types) !== \count($typesWithoutPrimitives);
         if ($hasPrimitives) {

@@ -16,7 +16,7 @@ use Pnz\JsonException\Json;
  *
  * The code generation is - at least for now - only implemented for JSON.
  */
-final class Serializer implements SerializerInterface
+final readonly class Serializer implements SerializerInterface
 {
     public function __construct(private string $cacheDirectory)
     {

@@ -1,0 +1,57 @@
+name: Benchmark
+
+on:
+    pull_request:
+
+permissions:
+    contents: read
+    pull-requests: write
+
+jobs:
+    benchmark:
+        name: "PHPBench"
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out code into the workspace
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - name: Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: 8.4
+                  # coverage: none disables xdebug - see https://github.com/shivammathur/setup-php#coverage-optiona
+                  coverage: none
+
+            - name: Build baseline from base branch
+              run: |
+                  git checkout ${{ github.event.pull_request.base.sha }}
+                  composer update --prefer-dist --no-interaction
+                  vendor/bin/phpbench run --progress=none --store --tag=base
+
+            - name: Benchmark PR and compare against baseline
+              run: |
+                  git checkout ${{ github.event.pull_request.head.sha }}
+                  composer update --prefer-dist --no-interaction
+                  vendor/bin/phpbench run --report=aggregate --ref=base --progress=none | tee benchmark-result.txt
+
+            - name: Build PR comment body
+              if: always()
+              run: |
+                  {
+                      echo "### Benchmark"
+                      echo ""
+                      echo "Comparison of this PR against the target branch."
+                      echo ""
+                      echo '```'
+                      cat benchmark-result.txt 2>/dev/null || echo "Benchmark run failed - see job logs."
+                      echo '```'
+                  } > benchmark-comment.md
+
+            - name: Comment benchmark comparison on PR
+              if: always()
+              uses: marocchino/sticky-pull-request-comment@v2
+              with:
+                  header: phpbench-comparison
+                  path: benchmark-comment.md

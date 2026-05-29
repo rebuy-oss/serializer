@@ -35,7 +35,7 @@
         "jms/serializer": "^1.13 || ^2 || ^3",
         "phpstan/phpstan": "^2.1.44",
         "phpstan/phpstan-phpunit": "^2.0.16",
-        "phpunit/phpunit": "^9.6",
+        "phpunit/phpunit": "^13.1.13",
         "rector/rector": "^2.4.5"
     },
     "autoload": {

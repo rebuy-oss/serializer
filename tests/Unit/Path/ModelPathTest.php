@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Tests\Liip\Serializer\Unit\Path;
 
 use Liip\Serializer\Path\ModelPath;
+use PHPUnit\Framework\Attributes\Small;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @small
- */
+#[Small]
 class ModelPathTest extends TestCase
 {
     public function testRoot(): void

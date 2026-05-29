@@ -11,6 +11,8 @@ use Liip\MetadataParser\Builder;
 use Liip\MetadataParser\ModelParser\JMSParser;
 use Liip\MetadataParser\ModelParser\PhpDocParser;
 use Liip\MetadataParser\ModelParser\ReflectionParser;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Medium;
 use Tests\Liip\Serializer\Fixtures\AccessorOrder;
 use Tests\Liip\Serializer\Fixtures\AccessorOrderInherit;
 use Tests\Liip\Serializer\Fixtures\BackedIntEnum;
@@ -40,9 +42,7 @@ use Tests\Liip\Serializer\Fixtures\UnknownArraySubType;
 use Tests\Liip\Serializer\Fixtures\Versions;
 use Tests\Liip\Serializer\Fixtures\VirtualProperties;
 
-/**
- * @medium
- */
+#[Medium]
 class SerializerGeneratorTest extends SerializerTestCase
 {
     private static Builder $metadataBuilder;
@@ -415,9 +415,7 @@ class SerializerGeneratorTest extends SerializerTestCase
         self::assertSame($expected, $data);
     }
 
-    /**
-     * @dataProvider providePrimitiveUnionDiscriminatorCases
-     */
+    #[DataProvider('providePrimitiveUnionDiscriminatorCases')]
     public function testPrimitiveUnionDiscriminator(mixed $propertyValue): void
     {
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_PrimitiveUnionTyping';

@@ -77,21 +77,12 @@ $jsonData{{jsonPath}} = {{propertyAccessor}};
 EOT;
 
     private const TMPL_ARRAY_ASSIGN = <<<'EOT'
-if ({{propertyAccessor}} instanceof \Doctrine\Common\Collections\Collection) {
-    $jsonData{{jsonPath}} = {{propertyAccessor}}->toArray();
-} else {
-    $jsonData{{jsonPath}} = {{propertyAccessor}};
-}
+$jsonData{{jsonPath}} = is_array({{propertyAccessor}}) ? {{propertyAccessor}} : iterator_to_array({{propertyAccessor}});
 EOT;
 
     private const TMPL_LOOP_ARRAY = <<<'EOT'
-{{indexVariable}}Array = {{propertyAccessor}};
-if ({{propertyAccessor}} instanceof \Doctrine\Common\Collections\Collection) {
-    {{indexVariable}}Array = {{propertyAccessor}}->toArray();
-}
-
 $jsonData{{jsonPath}} = [];
-foreach (array_keys({{indexVariable}}Array) as {{indexVariable}}) {
+foreach ({{propertyAccessor}} as {{indexVariable}} => {{valueVariable}}) {
     {{code}}
 }
 
@@ -106,12 +97,7 @@ EOT;
 if (0 === \count({{propertyAccessor}})) {
     $jsonData{{jsonPath}} = $emptyHashmap;
 } else {
-    {{indexVariable}}Array = {{propertyAccessor}};
-    if ({{propertyAccessor}} instanceof \Doctrine\Common\Collections\Collection) {
-        {{indexVariable}}Array = {{propertyAccessor}}->toArray();
-    }
-
-    foreach (array_keys({{indexVariable}}Array) as {{indexVariable}}) {
+    foreach ({{propertyAccessor}} as {{indexVariable}} => {{valueVariable}}) {
         {{code}}
     }
 }
@@ -198,12 +184,13 @@ EOT;
         ]);
     }
 
-    public function renderLoopArray(string $jsonPath, string $propertyAccessor, string $indexVariable, string $code): string
+    public function renderLoopArray(string $jsonPath, string $propertyAccessor, string $indexVariable, string $valueVariable, string $code): string
     {
         return $this->render(self::TMPL_LOOP_ARRAY, [
             'jsonPath' => $jsonPath,
             'propertyAccessor' => $propertyAccessor,
             'indexVariable' => $indexVariable,
+            'valueVariable' => $valueVariable,
             'code' => $code,
         ]);
     }
@@ -215,12 +202,13 @@ EOT;
         ]);
     }
 
-    public function renderLoopHashmap(string $jsonPath, string $propertyAccessor, string $indexVariable, string $code): string
+    public function renderLoopHashmap(string $jsonPath, string $propertyAccessor, string $indexVariable, string $valueVariable, string $code): string
     {
         return $this->render(self::TMPL_LOOP_HASHMAP, [
             'jsonPath' => $jsonPath,
             'propertyAccessor' => $propertyAccessor,
             'indexVariable' => $indexVariable,
+            'valueVariable' => $valueVariable,
             'code' => $code,
         ]);
     }

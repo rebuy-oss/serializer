@@ -347,21 +347,22 @@ final class DeserializerGenerator
         }
 
         $index = ModelPath::indexVariable((string) $arrayPath);
-        $arrayPropertyPath = $arrayPath->withVariable((string) $index);
+        $valuePath = new ArrayPath('value'.mb_strlen((string) $arrayPath));
+
         $modelPropertyPath = $modelPath->withArray((string) $index);
         $subType = $type->getSubType();
 
         switch ($subType) {
             case $subType instanceof PropertyTypeIterable:
-                $innerCode = $this->generateCodeForArray($subType, $arrayPropertyPath, $modelPropertyPath, $stack);
+                $innerCode = $this->generateCodeForArray($subType, $valuePath, $modelPropertyPath, $stack);
                 break;
 
             case $subType instanceof PropertyTypeEnum:
-                $innerCode = $this->generateCodeForEnumField($subType, $modelPropertyPath, $arrayPropertyPath);
+                $innerCode = $this->generateCodeForEnumField($subType, $modelPropertyPath, $valuePath);
                 break;
 
             case $subType instanceof PropertyTypeClass:
-                $innerCode = $this->generateCodeForClass($subType->getClassMetadata(), $arrayPropertyPath, $modelPropertyPath, $stack);
+                $innerCode = $this->generateCodeForClass($subType->getClassMetadata(), $valuePath, $modelPropertyPath, $stack);
                 break;
 
             case $subType instanceof PropertyTypeUnknown && $this->configuration->shouldAllowGenericArrays():
@@ -376,7 +377,7 @@ final class DeserializerGenerator
         }
 
         $code = $this->templating->renderInitArray((string) $modelPath);
-        $code .= $this->templating->renderLoop((string) $arrayPath, (string) $index, $innerCode);
+        $code .= $this->templating->renderLoop((string) $arrayPath, (string) $index, (string) $valuePath, $innerCode);
 
         return $code;
     }

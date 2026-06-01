@@ -2,6 +2,11 @@
 
 # 3.x
 
+# 3.6.0
+
+* Add `phpbench/phpbench` and some benchmarks
+* Improve performance of (de)serialization by adjusting the generated code a bit
+
 # 3.5.0
 
 * Configurable `serialize_null` allows choosing whether null fields are serialized. For that, create a generator

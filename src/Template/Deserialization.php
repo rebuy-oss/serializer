@@ -142,7 +142,7 @@ EOT;
 EOT;
 
     private const TMPL_LOOP = <<<'EOT'
-foreach (array_keys({{jsonPath}}) as {{indexVariable}}) {
+foreach ({{jsonPath}} as {{indexVariable}} => {{valueVariable}}) {
     {{code}}
 }
 
@@ -385,11 +385,12 @@ EOT;
         ]);
     }
 
-    public function renderLoop(string $jsonPath, string $indexVariable, string $code): string
+    public function renderLoop(string $jsonPath, string $indexVariable, string $valueVariable, string $code): string
     {
         return $this->render(self::TMPL_LOOP, [
             'jsonPath' => $jsonPath,
             'indexVariable' => $indexVariable,
+            'valueVariable' => $valueVariable,
             'code' => $code,
         ]);
     }

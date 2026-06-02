@@ -33,10 +33,10 @@ function {{functionName}}({{className}} $model, bool $useStdClass = true)
 EOT;
 
     private const TMPL_CLASS = <<<'EOT'
-$jsonData{{jsonPath}} = [];
+{{target}} = [];
 {{code}}
-if (0 === \count($jsonData{{jsonPath}})) {
-    $jsonData{{jsonPath}} = $emptyObject;
+if ([] === {{target}}) {
+    {{target}} = $emptyObject;
 }
 
 EOT;
@@ -73,15 +73,15 @@ if (is_array({{propertyAccessor}})) {
 EOT;
 
     private const TMPL_ASSIGN = <<<'EOT'
-$jsonData{{jsonPath}} = {{propertyAccessor}};
+{{target}} = {{propertyAccessor}};
 EOT;
 
     private const TMPL_ARRAY_ASSIGN = <<<'EOT'
-$jsonData{{jsonPath}} = is_array({{propertyAccessor}}) ? {{propertyAccessor}} : iterator_to_array({{propertyAccessor}});
+{{target}} = is_array({{propertyAccessor}}) ? {{propertyAccessor}} : iterator_to_array({{propertyAccessor}});
 EOT;
 
     private const TMPL_LOOP_ARRAY = <<<'EOT'
-$jsonData{{jsonPath}} = [];
+{{target}} = [];
 foreach ({{propertyAccessor}} as {{indexVariable}} => {{valueVariable}}) {
     {{code}}
 }
@@ -89,14 +89,15 @@ foreach ({{propertyAccessor}} as {{indexVariable}} => {{valueVariable}}) {
 EOT;
 
     private const TMPL_LOOP_ARRAY_EMPTY = <<<'EOT'
-$jsonData{{jsonPath}} = [];
+{{target}} = [];
 
 EOT;
 
     private const TMPL_LOOP_HASHMAP = <<<'EOT'
 if (0 === \count({{propertyAccessor}})) {
-    $jsonData{{jsonPath}} = $emptyHashmap;
+    {{target}} = $emptyHashmap;
 } else {
+    {{target}} = [];
     foreach ({{propertyAccessor}} as {{indexVariable}} => {{valueVariable}}) {
         {{code}}
     }
@@ -126,10 +127,10 @@ EOT;
         ]);
     }
 
-    public function renderClass(string $jsonPath, string $code): string
+    public function renderClass(string $target, string $code): string
     {
         return $this->render(self::TMPL_CLASS, [
-            'jsonPath' => $jsonPath,
+            'target' => $target,
             'code' => $code,
         ]);
     }
@@ -168,26 +169,26 @@ EOT;
         ]);
     }
 
-    public function renderAssign(string $jsonPath, string $propertyAccessor): string
+    public function renderAssign(string $target, string $propertyAccessor): string
     {
         return $this->render(self::TMPL_ASSIGN, [
-            'jsonPath' => $jsonPath,
+            'target' => $target,
             'propertyAccessor' => $propertyAccessor,
         ]);
     }
 
-    public function renderArrayAssign(string $jsonPath, string $propertyAccessor): string
+    public function renderArrayAssign(string $target, string $propertyAccessor): string
     {
         return $this->render(self::TMPL_ARRAY_ASSIGN, [
-            'jsonPath' => $jsonPath,
+            'target' => $target,
             'propertyAccessor' => $propertyAccessor,
         ]);
     }
 
-    public function renderLoopArray(string $jsonPath, string $propertyAccessor, string $indexVariable, string $valueVariable, string $code): string
+    public function renderLoopArray(string $target, string $propertyAccessor, string $indexVariable, string $valueVariable, string $code): string
     {
         return $this->render(self::TMPL_LOOP_ARRAY, [
-            'jsonPath' => $jsonPath,
+            'target' => $target,
             'propertyAccessor' => $propertyAccessor,
             'indexVariable' => $indexVariable,
             'valueVariable' => $valueVariable,
@@ -195,17 +196,17 @@ EOT;
         ]);
     }
 
-    public function renderLoopArrayEmpty(string $jsonPath): string
+    public function renderLoopArrayEmpty(string $target): string
     {
         return $this->render(self::TMPL_LOOP_ARRAY_EMPTY, [
-            'jsonPath' => $jsonPath,
+            'target' => $target,
         ]);
     }
 
-    public function renderLoopHashmap(string $jsonPath, string $propertyAccessor, string $indexVariable, string $valueVariable, string $code): string
+    public function renderLoopHashmap(string $target, string $propertyAccessor, string $indexVariable, string $valueVariable, string $code): string
     {
         return $this->render(self::TMPL_LOOP_HASHMAP, [
-            'jsonPath' => $jsonPath,
+            'target' => $target,
             'propertyAccessor' => $propertyAccessor,
             'indexVariable' => $indexVariable,
             'valueVariable' => $valueVariable,
@@ -213,10 +214,10 @@ EOT;
         ]);
     }
 
-    public function renderLoopHashmapEmpty(string $jsonPath): string
+    public function renderLoopHashmapEmpty(string $target): string
     {
         return $this->render(self::TMPL_LOOP_HASHMAP, [
-            'jsonPath' => $jsonPath,
+            'target' => $target,
         ]);
     }
 

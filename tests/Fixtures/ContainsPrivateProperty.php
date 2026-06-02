@@ -11,17 +11,10 @@ use JMS\Serializer\Annotation as Serializer;
  */
 class ContainsPrivateProperty
 {
-    /**
-     * @Serializer\Type("Tests\Liip\Serializer\Fixtures\PrivateProperty")
-     *
-     * @var PrivateProperty
-     */
-    public $child;
+    #[Serializer\Type(PrivateProperty::class)]
+    public ?PrivateProperty $child = null;
 
-    /**
-     * @Serializer\Type("string")
-     *
-     * @Serializer\Groups({"api"})
-     */
-    public $apiString;
+    #[Serializer\Type('string')]
+    #[Serializer\Groups(['api'])]
+    public ?string $apiString = null;
 }

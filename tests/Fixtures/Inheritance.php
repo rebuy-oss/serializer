@@ -8,8 +8,6 @@ use JMS\Serializer\Annotation as Serializer;
 
 class Inheritance extends PrivateProperty
 {
-    /**
-     * @Serializer\SerializedName("foo")
-     */
-    protected $extra;
+    #[Serializer\SerializedName('foo')]
+    protected ?string $extra = null;
 }

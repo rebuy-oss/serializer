@@ -9,44 +9,35 @@ use JMS\Serializer\Annotation as Serializer;
 
 class ListModel
 {
-    /**
-     * @Serializer\Type("array<string>")
-     */
+    #[Serializer\Type('array<string>')]
     public $array;
 
-    /**
-     * @Serializer\Type("array<string, Tests\Liip\Serializer\Fixtures\Nested>")
-     */
+    #[Serializer\Type('array<string, '.Nested::class.'>')]
     public $hashmap;
 
     /**
      * @var Nested[]
-     *
-     * @Serializer\Type("array<Tests\Liip\Serializer\Fixtures\Nested>")
      */
+    #[Serializer\Type('array<'.Nested::class.'>>')]
     public $listNested;
 
     /**
      * @var Nested[]
-     *
-     * @Serializer\Type("array<Tests\Liip\Serializer\Fixtures\Nested>")
-     *
-     * @Serializer\Accessor("getOptionalList")
      */
+    #[Serializer\Type('array<'.Nested::class.'>')]
+    #[Serializer\Accessor(getter: 'getOptionalList')]
     public $optionalList;
 
     /**
      * @var string[]|Collection|null
-     *
-     * @Serializer\Type("ArrayCollection<string>")
      */
+    #[Serializer\Type('ArrayCollection<string>')]
     public $collection;
 
     /**
      * @var Nested[string]|Collection|null
-     *
-     * @Serializer\Type("ArrayCollection<string, Tests\Liip\Serializer\Fixtures\Nested>")
      */
+    #[Serializer\Type('ArrayCollection<string, '.Nested::class.'>')]
     public $collectionNested;
 
     public function getOptionalList()

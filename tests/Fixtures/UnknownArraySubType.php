@@ -8,10 +8,6 @@ use JMS\Serializer\Annotation as Serializer;
 
 class UnknownArraySubType
 {
-    /**
-     * @var array
-     *
-     * @Serializer\Type("array")
-     */
-    public $unknownSubType;
+    #[Serializer\Type('array')]
+    public ?array $unknownSubType = null;
 }

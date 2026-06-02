@@ -8,8 +8,6 @@ use JMS\Serializer\Annotation as Serializer;
 
 class FloatProperty
 {
-    /**
-     * @Serializer\Type("float")
-     */
-    public $number;
+    #[Serializer\Type('float')]
+    public ?float $number = null;
 }

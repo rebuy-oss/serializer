@@ -11,17 +11,11 @@ class NonEmptyConstructor
     private const string FOOBAR = 'bar';
 
     public function __construct(
-        /**
-         * @Serializer\Type("string")
-         */
+        #[Serializer\Type('string')]
         private readonly string $apiString,
-        /**
-         * @Serializer\Exclude
-         */
+        #[Serializer\Exclude]
         private readonly array $onlyArgument = ['foo', self::FOOBAR],
-        /**
-         * @Serializer\Type("string")
-         */
+        #[Serializer\Type('string')]
         private readonly string $optional = 'optional',
     ) {
     }

@@ -8,10 +8,6 @@ use JMS\Serializer\Annotation as Serializer;
 
 class ContainsNonEmptyConstructor
 {
-    /**
-     * @Serializer\Type("Tests\Liip\Serializer\Fixtures\NonEmptyConstructor")
-     *
-     * @var NonEmptyConstructor
-     */
-    public $child;
+    #[Serializer\Type(NonEmptyConstructor::class)]
+    public ?NonEmptyConstructor $child = null;
 }

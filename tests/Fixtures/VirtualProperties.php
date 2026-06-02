@@ -8,18 +8,12 @@ use JMS\Serializer\Annotation as Serializer;
 
 class VirtualProperties
 {
-    /**
-     * @Serializer\Type("string")
-     */
-    public $apiString;
+    #[Serializer\Type('string')]
+    public ?string $apiString = null;
 
-    /**
-     * @Serializer\Type("string")
-     *
-     * @Serializer\VirtualProperty
-     *
-     * @Serializer\SerializedName("api_string_virtual")
-     */
+    #[Serializer\Type('string')]
+    #[Serializer\VirtualProperty]
+    #[Serializer\SerializedName('api_string_virtual')]
     public function getApiString(): string
     {
         return $this->apiString.'_virtual';

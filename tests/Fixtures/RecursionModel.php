@@ -8,15 +8,10 @@ use JMS\Serializer\Annotation as Serializer;
 
 class RecursionModel
 {
-    /**
-     * @Serializer\Type("string")
-     */
-    public $property;
+    #[Serializer\Type('string')]
+    public ?string $property = null;
 
-    /**
-     * @Serializer\MaxDepth(2)
-     *
-     * @Serializer\Type("Tests\Liip\Serializer\Fixtures\RecursionModel")
-     */
-    public $recursion;
+    #[Serializer\MaxDepth(2)]
+    #[Serializer\Type(self::class)]
+    public ?RecursionModel $recursion = null;
 }

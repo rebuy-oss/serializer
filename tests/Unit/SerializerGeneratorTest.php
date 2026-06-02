@@ -70,11 +70,12 @@ class SerializerGeneratorTest extends SerializerTestCase
         $expected = [
             'name' => 'John Doe',
             'age' => 25,
-            'properties' => [0 => 'first', 1 => 'second'],
+            'properties' => new \ArrayObject([0 => 'first', 1 => 'second']),
         ];
+
         $data = $functionName($model);
 
-        self::assertSame($expected, $data);
+        self::assertEquals($expected, $data);
     }
 
     public function testGroups(): void
@@ -186,23 +187,48 @@ class SerializerGeneratorTest extends SerializerTestCase
         $subject = new MultidimensionalArrayForPrimitive();
         $twoDims = [0 => [0], 1 => [1]];
         $fiveDims = [0 => [0 => [0 => [0 => [2]]]], 1 => [3 => [0 => [0 => [3]]]]];
-        $mapOfLists = ['foo' => [0], 'bar' => 1];
-        $listOfMapOfLists = [0 => ['m00' => [0 => [0], 1 => [1]], 'm01' => [0 => [0]]], 1 => ['m10' => [0 => [42]]]];
+        $mapOfLists = ['foo' => [0], 'bar' => [1]];
+        $listOfMapOfLists = [0 => ['m00' => [0 => 0, 1 => 1], 'm01' => [0 => 0]], 1 => ['m10' => [0 => 42]]];
 
         $subject->twoDims = $twoDims;
         $subject->fiveDims = $fiveDims;
         $subject->mapOfLists = $mapOfLists;
         $subject->listOfMapOfLists = $listOfMapOfLists;
 
+        $data = $functionName($subject);
+
         $expected = [
-            'two_dims' => $twoDims,
-            'five_dims' => $fiveDims,
+            'two_dims' => new \ArrayObject([0 => [0], 1 => [1]]),
+            'five_dims' => new \ArrayObject([
+                0 => new \ArrayObject(
+                    [
+                        0 => new \ArrayObject([
+                            0 => new \ArrayObject([0 => [2]]),
+                        ]),
+                    ]
+                ),
+                1 => [
+                    3 => new \ArrayObject([
+                        0 => new \ArrayObject([0 => [3]]),
+                    ]),
+                ],
+            ]),
             'map_of_lists' => $mapOfLists,
-            'list_of_map_of_lists' => $listOfMapOfLists,
+            'list_of_map_of_lists' => new \ArrayObject([
+                0 => [
+                    'm00' => [
+                        0 => 0,
+                        1 => 1,
+                    ],
+                    'm01' => [0 => 0],
+                ],
+                1 => [
+                    'm10' => [0 => 42],
+                ],
+            ]),
         ];
 
-        $data = $functionName($subject);
-        self::assertSame($expected, $data);
+        self::assertEquals($expected, $data);
     }
 
     public function testRecursions(): void

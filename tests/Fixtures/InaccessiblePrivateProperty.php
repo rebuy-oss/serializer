@@ -11,8 +11,6 @@ use JMS\Serializer\Annotation as Serializer;
  */
 class InaccessiblePrivateProperty
 {
-    /**
-     * @Serializer\Type("string")
-     */
-    private $apiString;
+    #[Serializer\Type('string')]
+    private ?string $apiString = null;
 }

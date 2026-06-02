@@ -31,6 +31,7 @@ use Tests\Liip\Serializer\Fixtures\FloatProperty;
 use Tests\Liip\Serializer\Fixtures\Inheritance;
 use Tests\Liip\Serializer\Fixtures\ListModel;
 use Tests\Liip\Serializer\Fixtures\Model;
+use Tests\Liip\Serializer\Fixtures\ModelWithAnnotations;
 use Tests\Liip\Serializer\Fixtures\ModelWithCustomType;
 use Tests\Liip\Serializer\Fixtures\Nested;
 use Tests\Liip\Serializer\Fixtures\NonEmptyConstructor;
@@ -54,6 +55,27 @@ class DeserializerGeneratorTest extends SerializerTestCase
             new PhpDocParser(),
             new JMSParser(new AnnotationReader()),
         ]);
+    }
+
+    public function testAnnotations(): void
+    {
+        $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_ModelWithAnnotations';
+        self::generateDeserializer(self::$metadataBuilder, ModelWithAnnotations::class, $functionName);
+
+        $input = [
+            'name' => 'John Doe',
+            'age' => 25,
+            'properties' => [0 => 'first', 1 => 'second'],
+        ];
+
+        /** @var ModelWithAnnotations $model */
+        $model = $functionName($input);
+        self::assertInstanceOf(ModelWithAnnotations::class, $model);
+        self::assertSame('John Doe', $model->name);
+        self::assertSame(25, $model->age);
+        self::assertCount(2, $model->properties);
+        self::assertSame('first', $model->properties[0]);
+        self::assertSame('second', $model->properties[1]);
     }
 
     public function testNested(): void

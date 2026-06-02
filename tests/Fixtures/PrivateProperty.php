@@ -8,26 +8,20 @@ use JMS\Serializer\Annotation as Serializer;
 
 class PrivateProperty
 {
-    /**
-     * @Serializer\Type("string")
-     *
-     * @Serializer\Accessor(getter="getExtra", setter="setExtra")
-     */
-    protected $extra;
+    #[Serializer\Type('string')]
+    #[Serializer\Accessor(getter: 'getExtra', setter: 'setExtra')]
+    protected ?string $extra = null;
 
-    /**
-     * @Serializer\Type("string")
-     *
-     * @Serializer\Accessor(getter="getApiString", setter="setApiString")
-     */
+    #[Serializer\Type('string')]
+    #[Serializer\Accessor(getter: 'getApiString', setter: 'setApiString')]
     private ?string $apiString = null;
 
-    public function getExtra()
+    public function getExtra(): ?string
     {
         return $this->extra;
     }
 
-    public function setExtra($extra): void
+    public function setExtra(?string $extra): void
     {
         $this->extra = $extra;
     }

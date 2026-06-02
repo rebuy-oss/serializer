@@ -30,6 +30,7 @@ use Tests\Liip\Serializer\Fixtures\InaccessiblePrivateProperty;
 use Tests\Liip\Serializer\Fixtures\Inheritance;
 use Tests\Liip\Serializer\Fixtures\ListModel;
 use Tests\Liip\Serializer\Fixtures\Model;
+use Tests\Liip\Serializer\Fixtures\ModelWithAnnotations;
 use Tests\Liip\Serializer\Fixtures\ModelWithCustomType;
 use Tests\Liip\Serializer\Fixtures\MultidimensionalArrayForPrimitive;
 use Tests\Liip\Serializer\Fixtures\Nested;
@@ -54,6 +55,26 @@ class SerializerGeneratorTest extends SerializerTestCase
             new PhpDocParser(),
             new JMSParser(new AnnotationReader()),
         ]);
+    }
+
+    public function testAnnotations(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ModelWithAnnotations';
+        self::generateSerializers(self::$metadataBuilder, ModelWithAnnotations::class, [$functionName], ['']);
+
+        $model = new ModelWithAnnotations();
+        $model->age = 25;
+        $model->name = 'John Doe';
+        $model->properties = [0 => 'first', 1 => 'second'];
+
+        $expected = [
+            'name' => 'John Doe',
+            'age' => 25,
+            'properties' => [0 => 'first', 1 => 'second'],
+        ];
+        $data = $functionName($model);
+
+        self::assertSame($expected, $data);
     }
 
     public function testGroups(): void

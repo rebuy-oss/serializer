@@ -6,12 +6,7 @@ namespace Tests\Liip\Serializer\Fixtures;
 
 use JMS\Serializer\Annotation as JMS;
 
-/**
- * @JMS\Discriminator(field = "type", map = {
- *     "first": "Tests\Liip\Serializer\Fixtures\DiscriminatorFirstChild",
- *     "second": "Tests\Liip\Serializer\Fixtures\DiscriminatorSecondChild"
- * })
- */
+#[JMS\Discriminator(field: 'type', map: ['first' => DiscriminatorFirstChild::class, 'second' => DiscriminatorSecondChild::class])]
 abstract class Discriminator
 {
 }

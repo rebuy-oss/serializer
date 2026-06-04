@@ -20,11 +20,10 @@ function {{functionName}}({{className}} $model, bool $useStdClass = true)
         if (is_array($data)) {
             return false;
         }
-    
+
         return null === $data || is_scalar($data);
     };
     
-
     {{code}}
 
     return $jsonData;
@@ -80,6 +79,19 @@ EOT;
 {{target}} = is_array({{propertyAccessor}}) ? {{propertyAccessor}} : iterator_to_array({{propertyAccessor}});
 EOT;
 
+    private const TMPL_HASHMAP = <<<'EOT'
+if (0 === \count({{arrayVariable}})) {
+    {{target}} = $emptyHashmap;
+} else {
+    {{target}} = array_is_list({{arrayVariable}}) ? new \ArrayObject({{arrayVariable}}) : {{arrayVariable}};
+}
+EOT;
+
+    private const TMPL_HASHMAP_EMPTY = <<<'EOT'
+{{target}} = $emptyHashmap;
+
+EOT;
+
     private const TMPL_LOOP_ARRAY = <<<'EOT'
 {{target}} = [];
 foreach ({{propertyAccessor}} as {{indexVariable}} => {{valueVariable}}) {
@@ -90,18 +102,6 @@ EOT;
 
     private const TMPL_LOOP_ARRAY_EMPTY = <<<'EOT'
 {{target}} = [];
-
-EOT;
-
-    private const TMPL_LOOP_HASHMAP = <<<'EOT'
-if (0 === \count({{propertyAccessor}})) {
-    {{target}} = $emptyHashmap;
-} else {
-    {{target}} = [];
-    foreach ({{propertyAccessor}} as {{indexVariable}} => {{valueVariable}}) {
-        {{code}}
-    }
-}
 
 EOT;
 
@@ -203,20 +203,17 @@ EOT;
         ]);
     }
 
-    public function renderLoopHashmap(string $target, string $propertyAccessor, string $indexVariable, string $valueVariable, string $code): string
+    public function renderHashmap(string $target, string $arrayVariable): string
     {
-        return $this->render(self::TMPL_LOOP_HASHMAP, [
+        return $this->render(self::TMPL_HASHMAP, [
             'target' => $target,
-            'propertyAccessor' => $propertyAccessor,
-            'indexVariable' => $indexVariable,
-            'valueVariable' => $valueVariable,
-            'code' => $code,
+            'arrayVariable' => $arrayVariable,
         ]);
     }
 
     public function renderLoopHashmapEmpty(string $target): string
     {
-        return $this->render(self::TMPL_LOOP_HASHMAP, [
+        return $this->render(self::TMPL_HASHMAP_EMPTY, [
             'target' => $target,
         ]);
     }

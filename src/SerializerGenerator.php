@@ -330,16 +330,16 @@ final class SerializerGenerator
         $value = '$value'.$depth;
 
         $subType = $type->getSubType();
-
-        switch ($subType) {
-            case $subType instanceof PropertyTypePrimitive:
-            case $subType instanceof PropertyTypeIterable && self::isArrayForPrimitive($subType):
-            case $subType instanceof PropertyTypeUnknown && $this->configuration->shouldAllowGenericArrays():
-                return $this->templating->renderArrayAssign($target, $modelPath);
-        }
-
         $listTarget = '$array'.$depth;
         $itemTarget = $listTarget.'['.$index.']';
+
+        if ($subType instanceof PropertyTypeUnknown && $this->configuration->shouldAllowGenericArrays()) {
+            return $this->templating->renderArrayAssign($target, $modelPath);
+        }
+
+        if ($subType instanceof PropertyTypePrimitive) {
+            return $this->renderLastArray($type, $target, $modelPath);
+        }
 
         switch ($subType) {
             case $subType instanceof PropertyTypeIterable:
@@ -366,13 +366,18 @@ final class SerializerGenerator
             return $this->templating->renderLoopArrayEmpty($target);
         }
 
+        $loop = $this->templating->renderLoopArray($listTarget, $modelPath, $index, $value, $innerCode);
+
+        return $loop.$this->renderLastArray($type, $target, $listTarget);
+    }
+
+    private function renderLastArray(PropertyTypeIterable $type, string $target, string $listTarget): string
+    {
         if ($type->isHashmap()) {
-            $loop = $this->templating->renderLoopHashmap($listTarget, $modelPath, $index, $value, $innerCode);
-        } else {
-            $loop = $this->templating->renderLoopArray($listTarget, $modelPath, $index, $value, $innerCode);
+            return $this->templating->renderHashmap($target, $listTarget);
         }
 
-        return $loop.$this->templating->renderAssign($target, $listTarget);
+        return $this->templating->renderArrayAssign($target, $listTarget);
     }
 
     /**
@@ -422,17 +427,5 @@ final class SerializerGenerator
         }
 
         return $code;
-    }
-
-    private static function isArrayForPrimitive(PropertyTypeIterable $type): bool
-    {
-        do {
-            $type = $type->getSubType();
-            if ($type instanceof PropertyTypePrimitive) {
-                return true;
-            }
-        } while ($type instanceof PropertyTypeIterable);
-
-        return false;
     }
 }

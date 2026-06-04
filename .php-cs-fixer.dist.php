@@ -35,6 +35,7 @@ return $config
             'php_unit_mock' => true,
             'php_unit_namespaced' => true,
             'php_unit_no_expectation_annotation' => true,
+            'php_unit_strict' => false,
             'phpdoc_to_return_type' => true,
             'static_lambda' => true,
             'ternary_to_null_coalescing' => true,

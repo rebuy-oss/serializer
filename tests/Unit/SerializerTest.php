@@ -4,21 +4,35 @@ declare(strict_types=1);
 
 namespace Tests\Liip\Serializer\Unit;
 
+use Doctrine\Common\Annotations\AnnotationReader;
+use Liip\MetadataParser\Builder;
+use Liip\MetadataParser\ModelParser\JMSParser;
+use Liip\MetadataParser\ModelParser\PhpDocParser;
+use Liip\MetadataParser\ModelParser\ReflectionParser;
 use Liip\Serializer\Context;
 use Liip\Serializer\Exception\Exception;
 use Liip\Serializer\Exception\UnsupportedFormatException;
 use Liip\Serializer\Exception\UnsupportedTypeException;
 use Liip\Serializer\Serializer;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\Small;
-use PHPUnit\Framework\TestCase;
+use Tests\Liip\Serializer\Fixtures\MultidimensionalArrayForPrimitive;
 use Tests\Liip\Serializer\Fixtures\SerializerFailureModel;
 use Tests\Liip\Serializer\Fixtures\SerializerModel;
 
 #[Small]
-#[RunTestsInSeparateProcesses]
-class SerializerTest extends TestCase
+class SerializerTest extends SerializerTestCase
 {
+    private static Builder $metadataBuilder;
+
+    public static function setUpBeforeClass(): void
+    {
+        static::$metadataBuilder = self::createMetadataBuilder([
+            new ReflectionParser(),
+            new PhpDocParser(),
+            new JMSParser(new AnnotationReader()),
+        ]);
+    }
+
     public function testSerialize(): void
     {
         $transform = new Serializer(__DIR__.'/../Fixtures');
@@ -139,5 +153,28 @@ class SerializerTest extends TestCase
         $data = $transform->fromArray([], SerializerModel::class);
         self::assertInstanceOf(SerializerModel::class, $data);
         self::assertSame('deserializer', $data->field);
+    }
+
+    public function testHashmapSerialization(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_MultidimensionalArrayForPrimitive';
+        self::generateSerializers(self::$metadataBuilder, MultidimensionalArrayForPrimitive::class, [$functionName], ['']);
+
+        $serializer = new Serializer('/tmp');
+
+        $subject = new MultidimensionalArrayForPrimitive();
+        $twoDims = [0 => [0], 1 => [1]];
+        $fiveDims = [0 => [0 => [0 => [0 => [2]]]], 1 => [3 => [0 => [0 => [3]]]]];
+        $mapOfLists = ['foo' => [0], 'bar' => [1]];
+        $listOfMapOfLists = [0 => ['m00' => [0 => 0, 1 => 1], 'm01' => [0 => 0]], 1 => ['m10' => [0 => 42]]];
+
+        $subject->twoDims = $twoDims;
+        $subject->fiveDims = $fiveDims;
+        $subject->mapOfLists = $mapOfLists;
+        $subject->listOfMapOfLists = $listOfMapOfLists;
+
+        $json = $serializer->serialize($subject, 'json');
+
+        self::assertSame('{"two_dims":{"0":[0],"1":[1]},"five_dims":{"0":{"0":{"0":{"0":[2]}}},"1":{"3":{"0":{"0":[3]}}}},"map_of_lists":{"foo":[0],"bar":[1]},"list_of_map_of_lists":{"0":{"m00":[0,1],"m01":[0]},"1":{"m10":[42]}}}', $json);
     }
 }

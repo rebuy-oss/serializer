@@ -10,14 +10,14 @@ use Twig\Loader\ArrayLoader;
 final class Deserialization
 {
     private const PRIMITIVE_CHECKS = [
-        'null' => 'is_null({{value}})',
-        'array' => 'is_array({{value}})',
+        'null' => '\is_null({{value}})',
+        'array' => '\is_array({{value}})',
         'int' => '(string) (int) {{value}} === (string) {{value}}',
         'float' => '(string) (float) {{value}} === (string) {{value}}',
         'bool' => '!is_array({{value}}) && (string) (bool) {{value}} === (string) {{value}}',
         'true' => 'true === {{value}}',
         'false' => 'false === {{value}}',
-        'string' => '!is_array({{value}}) && !is_object({{value}})',
+        'string' => '!\is_array({{value}}) && !\is_object({{value}})',
     ];
 
     private const PRIMITIVE_CASTS = [

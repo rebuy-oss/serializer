@@ -181,6 +181,14 @@ class GeneratorConfiguration implements \IteratorAggregate
         return null;
     }
 
+    /**
+     * If this is false, do not add wrap conditionals around assigning fields whose value is null
+     */
+    public function shouldSerializeNulls(): bool
+    {
+        return $this->options['generation']['serialization']['serialize_nulls'];
+    }
+
     public function getIterator(): \Traversable
     {
         return new \ArrayIterator($this->classesToGenerate);
@@ -197,10 +205,25 @@ class GeneratorConfiguration implements \IteratorAggregate
         $resolver->setDefaults([
             'allow_generic_arrays' => false,
             'handlers' => [],
+            'generation' => [
+                'serialization' => [
+                    'serialize_nulls' => false,
+                ],
+                //todo: add the `serialize_nulls` config for deserialization too
+            ],
         ]);
 
         $resolver->setAllowedTypes('allow_generic_arrays', 'boolean');
         $resolver->setAllowedTypes('handlers', 'array');
+
+        $resolver->setDefault('generation', static function(OptionsResolver $resolver) {
+            $resolver->setDefault('serialization', static function(OptionsResolver $resolver) {
+                $resolver->define('serialize_nulls')
+                    ->allowedTypes('bool')
+                    ->default(true);
+            });
+            //todo: add the `serialize_nulls` config for deserialization too
+        });
 
         return $resolver->resolve($options);
     }

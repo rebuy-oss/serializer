@@ -45,6 +45,11 @@ EOT;
 if (null !== {{condition}}) {
     {{code}}
 }
+{%- if elseCode -%}
+else {
+    {{elseCode}}
+}
+{% endif %}
 
 EOT;
 
@@ -143,11 +148,12 @@ EOT;
         ]);
     }
 
-    public function renderConditional(string $condition, string $code): string
+    public function renderConditional(string $condition, string $code, ?string $elseCode = null): string
     {
         return $this->render(self::TMPL_CONDITIONAL, [
             'condition' => $condition,
             'code' => $code,
+            'elseCode' => $elseCode,
         ]);
     }
 

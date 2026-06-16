@@ -215,11 +215,12 @@ class GeneratorConfiguration implements \IteratorAggregate
         $resolver->setAllowedTypes('allow_generic_arrays', 'boolean');
         $resolver->setAllowedTypes('handlers', 'array');
 
-        $resolver->setDefault('generation', static function(OptionsResolver $resolver) {
-            $resolver->setDefault('serialization', static function(OptionsResolver $resolver) {
+        $resolver->setDefault('generation', static function (OptionsResolver $resolver): void {
+            $resolver->setDefault('serialization', static function (OptionsResolver $resolver): void {
                 $resolver->define('serialize_null')
                     ->allowedTypes('bool')
-                    ->default(false);
+                    ->default(false)
+                ;
             });
         });
 

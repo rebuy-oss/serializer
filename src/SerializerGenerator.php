@@ -192,32 +192,69 @@ final class SerializerGenerator
 
         $modelPropertyPath = $modelPath.'->'.$propertyMetadata->getName();
         $fieldPath = $arrayPath.'["'.$propertyMetadata->getSerializedName().'"]';
+        $type = $propertyMetadata->getType();
+        $requiresExplicitNullSet = $this->fieldTypeRequiresExplicitNullSet($type);
+        $shouldSerializeNull = $this->configuration->shouldSerializeNull();
+        $setNull = $shouldSerializeNull ? $this->templating->renderAssign($fieldPath, 'null') : null;
 
         if ($propertyMetadata->getAccessor()->hasGetterMethod()) {
             $tempVariable = str_replace(['->', '[', ']', '$'], '', $modelPath).ucfirst($propertyMetadata->getName());
             $value = $this->templating->renderGetter($modelPath, $propertyMetadata->getAccessor()->getGetterMethod());
-            $type = $propertyMetadata->getType();
 
-            if ($this->configuration->shouldSerializeNull()) {
-                return $this->generateCodeForFieldType($type, $apiVersion, $serializerGroups, $fieldPath, $value, $stack) . "\n";
+            if ($shouldSerializeNull && !$requiresExplicitNullSet) {
+                return $this->generateCodeForFieldType($type, $apiVersion, $serializerGroups, $fieldPath, $value, $stack)."\n";
             }
 
-            $type = ($type instanceof AbstractPropertyType) ? $type->withNullable(false) : $type;
+            // the conditional is a null check, so the remaining expressions can assume non-null types
+            $nonNullType = ($type instanceof AbstractPropertyType) ? $type->asNullable(false) : $type;
 
             return $this->templating->renderConditional(
                 $this->templating->renderTempVariable($tempVariable, $value),
-                $this->generateCodeForFieldType($type, $apiVersion, $serializerGroups, $fieldPath, '$' . $tempVariable, $stack)
+                $this->generateCodeForFieldType($nonNullType, $apiVersion, $serializerGroups, $fieldPath, '$'.$tempVariable, $stack),
+                $setNull
             );
         }
         if (!$propertyMetadata->isPublic()) {
             throw new \Exception(\sprintf('Property %s is not public and no getter has been defined. Stack %s', $modelPropertyPath, var_export($stack, true)));
         }
 
-        $serializeField = $this->generateCodeForFieldType($propertyMetadata->getType(), $apiVersion, $serializerGroups, $fieldPath, $modelPropertyPath, $stack);
+        $serializeField = $this->generateCodeForFieldType($type, $apiVersion, $serializerGroups, $fieldPath, $modelPropertyPath, $stack);
 
-        return $this->configuration->shouldSerializeNull()
-            ? "{$serializeField}\n"
-            : $this->templating->renderConditional($modelPropertyPath, $serializeField);
+        if (!$shouldSerializeNull) {
+            return $this->templating->renderConditional($modelPropertyPath, $serializeField);
+        }
+
+        return $requiresExplicitNullSet
+            ? $this->templating->renderConditional($modelPropertyPath, $serializeField, $setNull)
+            : "{$serializeField}\n";
+    }
+
+    /**
+     * Whether a PropertyType requires the target to be set to null in a separate statement (returns true), or its expression already allows the null case (returns false)
+     *
+     * @return bool True if the type needs a separate statement for the null case
+     */
+    private function fieldTypeRequiresExplicitNullSet(PropertyType $type): bool
+    {
+        if (!$type->isNullable()) {
+            return false;
+        }
+
+        switch ($type) {
+            case $type instanceof PropertyTypePrimitive:
+            case $type instanceof PropertyTypeUnknown:
+            case $type instanceof PropertyTypeDateTime: // can use the null-check operator
+            case $type instanceof PropertyTypeEnum: // can use the null-check operator
+                return false;
+
+            case $type instanceof PropertyTypeClass:
+            case $type instanceof PropertyTypeIterable:
+                return true;
+
+            case $type instanceof PropertyTypeUnion:
+        }
+
+        return false;
     }
 
     /**
@@ -235,8 +272,7 @@ final class SerializerGenerator
         switch ($type) {
             case $type instanceof PropertyTypeDateTime:
                 $dateFormat = $type->getFormat() ?: \DateTimeInterface::ISO8601;
-                // fixme: due to https://github.com/rebuy-oss/serializer/pull/13#issuecomment-4718054163, can't rely on $type->isNullable()
-                $dateToString = $this->templating->renderDateTime($modelPropertyPath, $dateFormat, nullable: true /*$type->isNullable()*/);
+                $dateToString = $this->templating->renderDateTime($modelPropertyPath, $dateFormat, $type->isNullable());
 
                 return $this->templating->renderAssign($fieldPath, $dateToString);
 
@@ -247,6 +283,7 @@ final class SerializerGenerator
 
             case $type instanceof PropertyTypeEnum:
                 $valueAccess = $type->shouldSerializeAsValue() ? '->value' : '->name';
+                $valueAccess = ($type->isNullable() ? '?' : '').$valueAccess;
 
                 return $this->templating->renderAssign($fieldPath, $modelPropertyPath.$valueAccess);
 

@@ -2,6 +2,10 @@
 
 # 3.x
 
+# 3.5
+
+* Configurable `serialize_null` allows choosing whether null fields are serialized
+
 # 3.4.0
 
 * Maintenance of this library has been taken over by rebuy. The package has been  renamed from  `liip/serializer`

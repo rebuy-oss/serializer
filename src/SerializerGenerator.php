@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Liip\Serializer;
 
 use Liip\MetadataParser\Builder;
+use Liip\MetadataParser\Metadata\AbstractPropertyType;
 use Liip\MetadataParser\Metadata\ClassMetadata;
 use Liip\MetadataParser\Metadata\PropertyMetadata;
 use Liip\MetadataParser\Metadata\PropertyType;
@@ -194,12 +195,19 @@ final class SerializerGenerator
 
         if ($propertyMetadata->getAccessor()->hasGetterMethod()) {
             $tempVariable = str_replace(['->', '[', ']', '$'], '', $modelPath).ucfirst($propertyMetadata->getName());
-            $tempVariableAssignment = $this->templating->renderTempVariable($tempVariable, $this->templating->renderGetter($modelPath, $propertyMetadata->getAccessor()->getGetterMethod()));
-            $serializeField = $this->generateCodeForFieldType($propertyMetadata->getType(), $apiVersion, $serializerGroups, $fieldPath, '$' . $tempVariable, $stack);
+            $value = $this->templating->renderGetter($modelPath, $propertyMetadata->getAccessor()->getGetterMethod());
+            $type = $propertyMetadata->getType();
 
-            return $this->configuration->shouldSerializeNulls()
-                ? "{$tempVariableAssignment}\n{$serializeField}"
-                : $this->templating->renderConditional($tempVariableAssignment, $serializeField);
+            if ($this->configuration->shouldSerializeNull()) {
+                return $this->generateCodeForFieldType($type, $apiVersion, $serializerGroups, $fieldPath, $value, $stack) . "\n";
+            }
+
+            $type = ($type instanceof AbstractPropertyType) ? $type->withNullable(false) : $type;
+
+            return $this->templating->renderConditional(
+                $this->templating->renderTempVariable($tempVariable, $value),
+                $this->generateCodeForFieldType($type, $apiVersion, $serializerGroups, $fieldPath, '$' . $tempVariable, $stack)
+            );
         }
         if (!$propertyMetadata->isPublic()) {
             throw new \Exception(\sprintf('Property %s is not public and no getter has been defined. Stack %s', $modelPropertyPath, var_export($stack, true)));
@@ -207,8 +215,8 @@ final class SerializerGenerator
 
         $serializeField = $this->generateCodeForFieldType($propertyMetadata->getType(), $apiVersion, $serializerGroups, $fieldPath, $modelPropertyPath, $stack);
 
-        return $this->configuration->shouldSerializeNulls()
-            ? "{$modelPropertyPath}\n{$serializeField}"
+        return $this->configuration->shouldSerializeNull()
+            ? "{$serializeField}\n"
             : $this->templating->renderConditional($modelPropertyPath, $serializeField);
     }
 
@@ -227,11 +235,10 @@ final class SerializerGenerator
         switch ($type) {
             case $type instanceof PropertyTypeDateTime:
                 $dateFormat = $type->getFormat() ?: \DateTimeInterface::ISO8601;
+                // fixme: due to https://github.com/rebuy-oss/serializer/pull/13#issuecomment-4718054163, can't rely on $type->isNullable()
+                $dateToString = $this->templating->renderDateTime($modelPropertyPath, $dateFormat, nullable: true /*$type->isNullable()*/);
 
-                return $this->templating->renderAssign(
-                    $fieldPath,
-                    $this->templating->renderDateTime($modelPropertyPath, $dateFormat)
-                );
+                return $this->templating->renderAssign($fieldPath, $dateToString);
 
             case $type instanceof PropertyTypePrimitive:
             case $type instanceof PropertyTypeUnknown:

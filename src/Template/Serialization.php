@@ -115,7 +115,7 @@ EOT;
 
     private const TMPL_GETTER = '{{modelPath}}->{{method}}()';
 
-    private const TMPL_DATETIME = '{{propertyPath}}->format(\'{{format}}\');';
+    private const TMPL_DATETIME = '{{propertyPath}}{{ nullable ? "?" : "" }}->format(\'{{format}}\')';
 
     private const TMPL_TEMP_VAR = '${{name}} = {{value}}';
 
@@ -234,11 +234,12 @@ EOT;
         ]);
     }
 
-    public function renderDateTime(string $propertyPath, string $format): string
+    public function renderDateTime(string $propertyPath, string $format, bool $nullable = false): string
     {
         return $this->render(self::TMPL_DATETIME, [
             'propertyPath' => $propertyPath,
             'format' => $format,
+            'nullable' => $nullable,
         ]);
     }
 

@@ -19,14 +19,14 @@ use Pnz\JsonException\Json;
 final class Serializer implements SerializerInterface
 {
     /**
-     * @var array<string, callable>
+     * @var array<string, \Closure>
      */
-    private array $serializerFunctionNames = [];
+    private array $serializerFunctions = [];
 
     /**
-     * @var array<string, callable>
+     * @var array<string, \Closure>
      */
-    private array $deserializerFunctionNames = [];
+    private array $deserializerFunctions = [];
 
     public function __construct(private readonly string $cacheDirectory)
     {
@@ -103,9 +103,9 @@ final class Serializer implements SerializerInterface
             throw new Exception('Version and group support is not implemented for deserialization. It is only supported for serialization');
         }
 
-        $functionName = $this->deserializerFunctionNames[$type] ?? null;
+        $function = $this->deserializerFunctions[$type] ?? null;
 
-        if (null === $functionName) {
+        if (null === $function) {
             $functionName = DeserializerGenerator::buildDeserializerFunctionName($type);
             $filename = \sprintf('%s/%s.php', $this->cacheDirectory, $functionName);
             if (!file_exists($filename)) {
@@ -118,11 +118,12 @@ final class Serializer implements SerializerInterface
                 throw new Exception(\sprintf('Internal Error: Deserializer for %s in file %s does not have expected function %s', $type, $filename, $functionName));
             }
 
-            $this->deserializerFunctionNames[$type] = $functionName;
+            $function = $functionName(...);
+            $this->deserializerFunctions[$type] = $function;
         }
 
         try {
-            return $functionName($data);
+            return $function($data);
         } catch (\Throwable $t) {
             throw new Exception('Error during deserialization', 0, $t);
         }
@@ -147,9 +148,9 @@ final class Serializer implements SerializerInterface
         }
 
         $cacheKey = $type.'|'.$version.'|'.implode(',', $groups);
-        $functionName = $this->serializerFunctionNames[$cacheKey] ?? null;
+        $function = $this->serializerFunctions[$cacheKey] ?? null;
 
-        if (null === $functionName) {
+        if (null === $function) {
             $functionName = SerializerGenerator::buildSerializerFunctionName($type, $version, $groups);
             $filename = \sprintf('%s/%s.php', $this->cacheDirectory, $functionName);
             if (!file_exists($filename)) {
@@ -162,11 +163,12 @@ final class Serializer implements SerializerInterface
                 throw new Exception(\sprintf('Internal Error: Serializer for %s in file %s does not have expected function %s', $type, $filename, $functionName));
             }
 
-            $this->serializerFunctionNames[$cacheKey] = $functionName;
+            $function = $functionName(...);
+            $this->serializerFunctions[$cacheKey] = $function;
         }
 
         try {
-            return $functionName($data, $useStdClass);
+            return $function($data, $useStdClass);
         } catch (\Throwable $t) {
             throw new Exception('Error during serialization', 0, $t);
         }

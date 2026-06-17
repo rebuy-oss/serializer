@@ -49,6 +49,11 @@ use Liip\Serializer\Template\Serialization;
 $configuration = GeneratorConfiguration::createFomArray([
     'options' => [
         'allow_generic_arrays' => false,
+        'generation' => [
+            'serialization' => [
+                'serialize_null' => false // optional, default is `false`
+            ],
+        ],
     ],
     'default_group_combinations' => ['api'],
     'default_versions' => ['', '1', '2'],

@@ -6,6 +6,7 @@ namespace Liip\Serializer\Configuration;
 
 use Liip\Serializer\DeserializerHandlerInterface;
 use Liip\Serializer\SerializerHandlerInterface;
+use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
@@ -181,6 +182,14 @@ class GeneratorConfiguration implements \IteratorAggregate
         return null;
     }
 
+    /**
+     * If this is false, do not add wrap conditionals around assigning fields whose value is null
+     */
+    public function shouldSerializeNull(): bool
+    {
+        return $this->options['generation']['serialization']['serialize_null'];
+    }
+
     public function getIterator(): \Traversable
     {
         return new \ArrayIterator($this->classesToGenerate);
@@ -197,10 +206,42 @@ class GeneratorConfiguration implements \IteratorAggregate
         $resolver->setDefaults([
             'allow_generic_arrays' => false,
             'handlers' => [],
+            'generation' => [
+                'serialization' => [
+                    'serialize_null' => false,
+                ],
+            ],
         ]);
 
         $resolver->setAllowedTypes('allow_generic_arrays', 'boolean');
         $resolver->setAllowedTypes('handlers', 'array');
+
+        // This is insanity, but the issue is that symfony/options-resolver 4.x uses setDefault() for nested options, but
+        //   7.x introduces setOptions() (and deprecates setDefault()), and 8.x removes setDefault entirely. PhpStan's
+        //   static analysis doesn't seem to want to ignore the `if` block on low versions, but telling phpstan to ignore
+        //   those errors fails on higher versions where there are no errors to ignore. Currently, the only way to get
+        //   PhpStan to back off is to hide what call I'm making entirely using strings for dynamic method calls. Even
+        //   the @var is necessary, otherwise, PhpStan picks up that $setOptions is a constant (not just a variable string)
+        //   and is able to repeat the warnings.
+        /** @var string $setOptions */
+        $setOptions = 'setOptions';
+        if (method_exists($resolver, $setOptions)) {
+            $resolver->{$setOptions}('generation', static function (OptionsResolver $resolver, Options $_) use ($setOptions): void {
+                $resolver->{$setOptions}('serialization', static function (OptionsResolver $resolver, Options $_): void {
+                    $resolver->setDefault('serialize_null', false);
+                    $resolver->setAllowedTypes('serialize_null', 'bool');
+                });
+            });
+        } else {
+            $resolver->setDefault('generation', static function (OptionsResolver $resolver): OptionsResolver {
+                return $resolver->setDefault('serialization', static function (OptionsResolver $resolver): OptionsResolver {
+                    $resolver->setDefault('serialize_null', false);
+                    $resolver->setAllowedTypes('serialize_null', 'bool');
+
+                    return $resolver;
+                });
+            });
+        }
 
         return $resolver->resolve($options);
     }

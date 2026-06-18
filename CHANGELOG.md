@@ -12,6 +12,11 @@
 
 # 3.x
 
+# 3.5.0
+
+* Configurable `serialize_null` allows choosing whether null fields are serialized. For that, create a generator
+  configuration with options[`generation`][`serialization`][`serialize_null`] set to `true` 
+
 # 3.4.0
 
 * Maintenance of this library has been taken over by rebuy. The package has been  renamed from  `liip/serializer`

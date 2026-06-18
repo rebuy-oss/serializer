@@ -52,7 +52,7 @@ class SerializerGeneratorTest extends SerializerTestCase
     {
         static::$metadataBuilder = self::createMetadataBuilder([
             new ReflectionParser(),
-            new PhpDocParser(),
+            new PhpDocParser(strict: false),
             new JMSParser(new AnnotationReader()),
         ]);
     }
@@ -269,6 +269,27 @@ class SerializerGeneratorTest extends SerializerTestCase
 
         self::assertInstanceOf(\stdClass::class, $data);
         self::assertCount(0, get_object_vars($data));
+    }
+
+    public function testEmptyModelWithSerializeNull(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ModelWithNull';
+        $alias = Model::class.'WithNull';
+        class_alias(Model::class, $alias);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
+            'generation' => [
+                'serialization' => ['serialize_null' => true],
+            ],
+        ]);
+
+        $model = new Model();
+        $data = $functionName($model, false);
+
+        self::assertIsArray($data);
+        self::assertNotCount(0, $data);
+        self::assertArrayHasKey('un_annotated', $data);
+        self::assertArrayHasKey('nested_field', $data);
+        self::assertArrayHasKey('date', $data);
     }
 
     public function testEmptyModelNotUsingStdClass(): void

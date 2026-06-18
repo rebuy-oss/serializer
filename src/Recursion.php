@@ -8,18 +8,13 @@ use Liip\MetadataParser\Metadata\PropertyMetadata;
 use Liip\MetadataParser\Metadata\PropertyTypeClass;
 use Liip\MetadataParser\Metadata\PropertyTypeIterable;
 
-abstract class Recursion
+/**
+ * @internal
+ */
+final class Recursion
 {
-    /**
-     * @param array<string, positive-int> $stack
-     */
-    public static function check(string $className, array $stack, string $modelPath): bool
+    private function __construct()
     {
-        if (\array_key_exists($className, $stack) && $stack[$className] > 1) {
-            throw new \Exception(\sprintf('recursion for %s at %s', key($stack), $modelPath));
-        }
-
-        return false;
     }
 
     /**

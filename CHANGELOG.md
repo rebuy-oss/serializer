@@ -9,6 +9,8 @@
 * Add `phpbench/phpbench` and some benchmarks
 * Improve performance of (de)serialization by adjusting the generated code a bit
 * Fix wrong serialization for hashmaps
+* Rename `GeneratorConfiguration::createFomArray()` to `createFromArray()` (typo fix)
+* Remove dead `Recursion::check()` method
 
 # 3.x
 

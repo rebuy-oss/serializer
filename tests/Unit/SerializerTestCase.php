@@ -32,7 +32,7 @@ class SerializerTestCase extends TestCase
     protected static function generateDeserializer(Builder $metadataBuilder, string $classToGenerate, string $functionName, array $options = []): void
     {
         $templating = new Deserialization();
-        $configuration = GeneratorConfiguration::createFomArray(['classes' => [$classToGenerate => []], 'options' => $options]);
+        $configuration = GeneratorConfiguration::createFromArray(['classes' => [$classToGenerate => []], 'options' => $options]);
         $deserializerGenerator = new DeserializerGenerator($templating, [], '/tmp', $configuration);
 
         $deserializerGenerator->generate($metadataBuilder);
@@ -46,7 +46,7 @@ class SerializerTestCase extends TestCase
     protected static function generateSerializers(Builder $metadataBuilder, string $classToGenerate, array $functionNames, array $versions = ['2'], array $groups = [], array $options = []): void
     {
         $templating = new Serialization();
-        $configuration = GeneratorConfiguration::createFomArray([
+        $configuration = GeneratorConfiguration::createFromArray([
             'default_group_combinations' => $groups,
             'default_versions' => $versions,
             'classes' => [

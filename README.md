@@ -46,7 +46,7 @@ use Liip\Serializer\SerializerGenerator;
 use Liip\Serializer\Template\Deserialization;
 use Liip\Serializer\Template\Serialization;
 
-$configuration = GeneratorConfiguration::createFomArray([
+$configuration = GeneratorConfiguration::createFromArray([
     'options' => [
         'allow_generic_arrays' => false,
         'generation' => [

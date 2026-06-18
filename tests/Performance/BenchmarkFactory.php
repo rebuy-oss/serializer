@@ -46,7 +46,7 @@ final class BenchmarkFactory
             new RecursionChecker(null, []),
         );
 
-        $configuration = GeneratorConfiguration::createFomArray([
+        $configuration = GeneratorConfiguration::createFromArray([
             'default_group_combinations' => [[]],
             'default_versions' => [''],
             'classes' => [

@@ -96,7 +96,7 @@ class GeneratorConfiguration implements \IteratorAggregate
      *     ]
      * ]
      */
-    public static function createFomArray(array $config): self
+    public static function createFromArray(array $config): self
     {
         if (!\array_key_exists('classes', $config) || (is_countable($config['classes']) ? \count($config['classes']) : 0) < 1) {
             throw new \InvalidArgumentException('You need to specify the classes to generate');

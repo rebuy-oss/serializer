@@ -9,6 +9,7 @@
 * Add `phpbench/phpbench` and some benchmarks
 * Improve performance of (de)serialization by adjusting the generated code a bit
 * Fix wrong serialization for hashmaps
+* Rename `GeneratorConfiguration::createFomArray()` to `createFromArray()` (typo fix)
 
 # 3.x
 

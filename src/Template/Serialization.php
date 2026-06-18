@@ -259,7 +259,7 @@ EOT;
     public function renderConditionalUsingTempVariable(string|ModelPath $tempVariable, string|ModelPath $propertyAccessor, string $code): string
     {
         return $this->render(self::TMPL_CONDITIONAL, [
-            'condition' => $this->renderTempVariable($tempVariable, $propertyAccessor),
+            'condition' => $this->renderTempVariable("{$tempVariable}", "{$propertyAccessor}"),
             'code' => $code,
         ]);
     }
@@ -274,12 +274,12 @@ EOT;
         return $tmpl->render($parameters);
     }
 
-    public static function varJsonPath()
+    public static function varJsonPath(): ModelPath
     {
         return new ModelPath('jsonData');
     }
 
-    public static function varModel()
+    public static function varModel(): ModelPath
     {
         return new ModelPath('model');
     }

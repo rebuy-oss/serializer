@@ -29,23 +29,34 @@ final class ModelPath implements \Stringable
      */
     public static function tempVariable(array $components): self
     {
-        $components = array_map(
-            static fn (string $component): string => ucfirst(str_replace(['->', '[', ']', '$'], '', $component)),
-            $components
-        );
-
-        return new self(lcfirst(implode('', $components)));
+        return new self(lcfirst(self::distillName(...$components)));
     }
 
     public static function indexVariable(string $path): self
     {
-        return new self('index'.mb_strlen($path));
+        return self::inventVariable($path, 'index');
     }
 
-    public function withPath(string $component): self
+    public static function inventVariable(string $path, string $prefix): self
+    {
+        return new self($prefix.mb_strlen($path).self::distillName($path));
+    }
+
+    public static function distillName(string ...$components): string
+    {
+        $name = '';
+
+        foreach ($components as $component) {
+            $name .= ucfirst(preg_replace('/\W+/', '', mb_strtolower($component)));
+        }
+
+        return $name;
+    }
+
+    public function withPath(string $component, bool $nullCheck = false): self
     {
         $clone = clone $this;
-        $clone->path[] = new ModelEntry($component);
+        $clone->path[] = new ModelEntry($component, $nullCheck);
 
         return $clone;
     }
@@ -66,7 +77,7 @@ final class ModelPath implements \Stringable
     public function withArrayLiteral(string $component): self
     {
         $clone = clone $this;
-        $clone->path[] = new ArrayEntry((string)new LiteralValue($component));
+        $clone->path[] = new ArrayEntry((string) new LiteralValue($component));
 
         return $clone;
     }

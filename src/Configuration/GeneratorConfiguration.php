@@ -73,6 +73,10 @@ class GeneratorConfiguration implements \IteratorAggregate
      * [
      *     'options' => [
      *         'allow_generic_arrays' => true,
+     *         'generation' => [
+     *              'serialization' => ['serialize_null => true],
+     *              'deserialization' => ['null_as_default => false],
+     *          ]
      *     ],
      *     'default_group_combinations' => [['api']],
      *     'default_versions' => ['', '1', '2'],
@@ -190,6 +194,14 @@ class GeneratorConfiguration implements \IteratorAggregate
         return $this->options['generation']['serialization']['serialize_null'];
     }
 
+    /**
+     * If this is false, do not add wrap conditionals around assigning fields whose value is null
+     */
+    public function shouldTreatNullAsDefault(): bool
+    {
+        return $this->options['generation']['deserialization']['null_as_default'];
+    }
+
     public function getIterator(): \Traversable
     {
         return new \ArrayIterator($this->classesToGenerate);
@@ -209,6 +221,9 @@ class GeneratorConfiguration implements \IteratorAggregate
             'generation' => [
                 'serialization' => [
                     'serialize_null' => false,
+                ],
+                'deserialization' => [
+                    'null_as_default' => true,
                 ],
             ],
         ]);
@@ -231,12 +246,22 @@ class GeneratorConfiguration implements \IteratorAggregate
                     $resolver->setDefault('serialize_null', false);
                     $resolver->setAllowedTypes('serialize_null', 'bool');
                 });
+                $resolver->{$setOptions}('deserialization', static function (OptionsResolver $resolver, Options $_): void {
+                    $resolver->setDefault('null_as_default', true);
+                    $resolver->setAllowedTypes('null_as_default', 'bool');
+                });
             });
         } else {
             $resolver->setDefault('generation', static function (OptionsResolver $resolver): OptionsResolver {
-                return $resolver->setDefault('serialization', static function (OptionsResolver $resolver): OptionsResolver {
+                $resolver->setDefault('serialization', static function (OptionsResolver $resolver): OptionsResolver {
                     $resolver->setDefault('serialize_null', false);
                     $resolver->setAllowedTypes('serialize_null', 'bool');
+
+                    return $resolver;
+                });
+                return $resolver->setDefault('deserialization', static function (OptionsResolver $resolver): OptionsResolver {
+                    $resolver->setDefault('null_as_default', true);
+                    $resolver->setAllowedTypes('null_as_default', 'bool');
 
                     return $resolver;
                 });

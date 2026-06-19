@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Liip\Serializer\Template;
 
+use DateTimeImmutable;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
 
@@ -49,8 +50,9 @@ EOT;
 
     private const TMPL_ARGUMENT = <<<'EOT'
 {{variableName}} = {{default}};
+{%- if code is not null ~%}
 {{code}}
-
+{%- endif -%}
 EOT;
 
     private const TMPL_POST_METHOD = <<<'EOT'
@@ -79,6 +81,16 @@ if ({{typeConditional}}) {
 
 EOT;
 
+    private const TMPL_KEY_EXISTS_CONDITIONAL = <<<'EOT'
+if (\array_key_exists({{index}}, {{data}})) {
+    {{code}}
+} {% if elseCode is not null %} else {
+    {{ elseCode }}
+}{% endif %}
+
+
+EOT;
+
     private const TMPL_ASSIGN_JSON_DATA_TO_FIELD = <<<'EOT'
 {{modelPath}} = {{jsonPath}};
 
@@ -90,44 +102,23 @@ EOT;
 EOT;
 
     private const TMPL_ASSIGN_DATETIME_TO_FIELD = <<<'EOT'
-{{modelPath}} = new \DateTime({{jsonPath}});
+{{modelPath}} = new {{dateClass}}({{jsonPath}});
 
 EOT;
 
     private const TMPL_ASSIGN_DATETIME_FROM_FORMAT = <<<'EOT'
-{{date}} = false;
-foreach([{{formats|join(', ')}}] as {{format}}) {
-    if (({{date}} = \DateTime::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
-        {{modelPath}} = {{date}};
-        break;
-    }
+{% if not formats %}
+{{varDate}} = false;
+{% endif %}
+{% for format in formats %}
+{{ loop.first ? '' : ' else'}} if (({{varDate}} = {{dateClass}}::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
+    {{modelPath}} = {{varDate}};
 }
-
-if (false === {{date}}) {
+{% endfor %}
+{{ formats ? ' else ' : "if (false === #{varDate}})" }} {
     throw new \Exception('Invalid datetime string '.({{jsonPath}}).' matches none of the deserialization formats: '.{{formatsError}});
 }
-unset({{format}}, {{date}});
-
-EOT;
-
-    private const TMPL_ASSIGN_DATETIME_IMMUTABLE_TO_FIELD = <<<'EOT'
-{{modelPath}} = new \DateTimeImmutable({{jsonPath}});
-
-EOT;
-
-    private const TMPL_ASSIGN_DATETIME_IMMUTABLE_FROM_FORMAT = <<<'EOT'
-{{date}} = false;
-foreach([{{formats|join(', ')}}] as {{format}}) {
-    if (({{date}} = \DateTimeImmutable::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
-        {{modelPath}} = {{date}};
-        break;
-    }
-}
-
-if (false === {{date}}) {
-    throw new \Exception('Invalid datetime string '.({{jsonPath}}).' matches none of the deserialization formats: '.{{formatsError}});
-}
-unset({{format}}, {{date}});
+unset({{varDate}});
 
 EOT;
 
@@ -210,7 +201,7 @@ EOT;
         ]);
     }
 
-    public function renderArgument(string $variableName, string $default, string $code): string
+    public function renderArgument(string $variableName, string $default, ?string $code): string
     {
         return $this->render(self::TMPL_ARGUMENT, [
             'variableName' => $variableName,
@@ -262,6 +253,26 @@ EOT;
         ]);
     }
 
+    public function renderKeyExistsConditional(string $data, string $key, string $code, ?string $elseCode = null): string
+    {
+        return $this->render(self::TMPL_KEY_EXISTS_CONDITIONAL, [
+            'data' => $data,
+            'index' => var_export($key, true),
+            'code' => $code,
+            'elseCode' => $elseCode,
+        ]);
+    }
+
+    public function renderDynamicKeyExistsConditional(string $data, string $key, string $code, ?string $elseCode = null): string
+    {
+        return $this->render(self::TMPL_KEY_EXISTS_CONDITIONAL, [
+            'data' => $data,
+            'index' => $key,
+            'code' => $code,
+            'elseCode' => $elseCode,
+        ]);
+    }
+
     public function renderAssignJsonDataToField(string $modelPath, string $jsonPath): string
     {
         return $this->render(self::TMPL_ASSIGN_JSON_DATA_TO_FIELD, [
@@ -296,11 +307,12 @@ EOT;
 
     public function renderAssignDateTimeToField(bool $immutable, string $modelPath, string $jsonPath): string
     {
-        $template = $immutable ? self::TMPL_ASSIGN_DATETIME_IMMUTABLE_TO_FIELD : self::TMPL_ASSIGN_DATETIME_TO_FIELD;
+        $dateClass = $immutable ? \DateTimeImmutable::class : \DateTime::class;
 
-        return $this->render($template, [
+        return $this->render(self::TMPL_ASSIGN_DATETIME_TO_FIELD, [
             'modelPath' => $modelPath,
             'jsonPath' => $jsonPath,
+            'dateClass' => $dateClass,
         ]);
     }
 
@@ -309,7 +321,7 @@ EOT;
      */
     public function renderAssignDateTimeFromFormat(bool $immutable, string $modelPath, string $jsonPath, array $formats, ?string $timezone = null): string
     {
-        $template = $immutable ? self::TMPL_ASSIGN_DATETIME_IMMUTABLE_FROM_FORMAT : self::TMPL_ASSIGN_DATETIME_FROM_FORMAT;
+        $dateClass = $immutable ? DateTimeImmutable::class : \DateTime::class;
         $formats = array_map(
             static fn (string $f): string => var_export($f, true),
             $formats
@@ -321,13 +333,15 @@ EOT;
             $modelPath
         ).'Date';
 
-        return $this->render($template, [
+
+        return $this->render(self::TMPL_ASSIGN_DATETIME_FROM_FORMAT, [
             'modelPath' => $modelPath,
             'jsonPath' => $jsonPath,
             'formats' => $formats,
             'formatsError' => $formatsError,
-            'format' => '$'.lcfirst($dateVariable).'Format',
-            'date' => '$'.lcfirst($dateVariable),
+            'dateClass' => $dateClass,
+            'varFormat' => '$'.lcfirst($dateVariable).'Format',
+            'varDate' => '$'.lcfirst($dateVariable),
             'timezone' => $timezone ? 'new \DateTimeZone('.var_export($timezone, true).')' : 'null',
         ]);
     }

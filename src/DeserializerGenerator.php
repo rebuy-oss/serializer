@@ -18,6 +18,7 @@ use Liip\MetadataParser\Metadata\PropertyTypeUnknown;
 use Liip\MetadataParser\Reducer\TakeBestReducer;
 use Liip\Serializer\Configuration\ClassToGenerate;
 use Liip\Serializer\Configuration\GeneratorConfiguration;
+use Liip\Serializer\Path\ArrayEntry;
 use Liip\Serializer\Path\ArrayPath;
 use Liip\Serializer\Path\ModelPath;
 use Liip\Serializer\Template\Deserialization;
@@ -120,12 +121,22 @@ final class DeserializerGenerator
                     $overwrittenNames[$propertyMetadata->getName()] = true;
                 }
                 $constructorArgumentNames[$propertyMetadata->getName()] = (string) $tempVariable;
+                $getValue = $this->generateInnerCodeForFieldType($propertyMetadata, $propertyArrayPath, $tempVariable, $stack);
 
-                $initCode .= $this->templating->renderArgument(
-                    (string) $tempVariable,
-                    $default,
-                    $this->generateCodeForField($propertyMetadata, $propertyArrayPath, $tempVariable, $stack)
-                );
+                if ($this->configuration->shouldTreatNullAsDefault()) {
+                    $initCode .= $this->templating->renderArgument(
+                        (string)$tempVariable,
+                        $default,
+                        $this->templating->renderConditional((string)$propertyArrayPath, $getValue)
+                    );
+                } else {
+                    $initCode .= $this->templating->renderKeyExistsConditional(
+                        (string) $arrayPath,
+                        $propertyMetadata->getSerializedName(),
+                        $getValue,
+                        $this->templating->renderArgument((string)$tempVariable, $default, null),
+                    );
+                }
             } else {
                 $code .= $this->generateCodeForProperty($propertyMetadata, $propertyArrayPath, $modelPath, $stack);
             }
@@ -197,21 +208,70 @@ final class DeserializerGenerator
             return '';
         }
 
+        /** @var non-empty-list<ArrayEntry> $arrayPathLastKey */
+        [$arrayPathBase, $arrayPathLastKey] = $arrayPath->splitBack();
+        $arrayPathLastKey = array_pop($arrayPathLastKey)->getPath();
+
         if ($propertyMetadata->getAccessor()->hasSetterMethod()) {
             $tempVariable = ModelPath::tempVariable([(string) $modelPath, $propertyMetadata->getName()]);
-            $code = $this->generateCodeForField($propertyMetadata, $arrayPath, $tempVariable, $stack);
-            $code .= $this->templating->renderConditional(
-                (string) $tempVariable,
-                $this->templating->renderSetter((string) $modelPath, $propertyMetadata->getAccessor()->getSetterMethod(), (string) $tempVariable)
-            );
+            $getValue = $this->generateInnerCodeForFieldType($propertyMetadata, $arrayPath, $tempVariable, $stack);
+            $setIntoModel = $this->templating->renderSetter((string)$modelPath, $propertyMetadata->getAccessor()->getSetterMethod(), (string)$tempVariable);
+
+            if ($this->configuration->shouldTreatNullAsDefault()) {
+                $code = $this->templating->renderConditional((string) $arrayPath, $getValue);
+                $code .= $this->templating->renderConditional((string) $tempVariable, $setIntoModel);
+            } else {
+                $code = $this->templating->renderKeyExistsConditional((string)$arrayPathBase, (string) $arrayPathLastKey, "{$getValue}    {$setIntoModel}");
+            }
             $code .= $this->templating->renderUnset([(string) $tempVariable]);
 
             return $code;
         }
 
         $modelPropertyPath = $modelPath->withPath($propertyMetadata->getName());
+        $getValue = $this->generateInnerCodeForFieldType($propertyMetadata, $arrayPath, $modelPropertyPath, $stack);
 
-        return $this->generateCodeForField($propertyMetadata, $arrayPath, $modelPropertyPath, $stack);
+        if ($this->configuration->shouldTreatNullAsDefault()) {
+            return $this->templating->renderConditional((string)$arrayPath, $getValue);
+        } else {
+            return $this->templating->renderDynamicKeyExistsConditional((string) $arrayPathBase, (string) $arrayPathLastKey, $getValue);
+        }
+    }
+
+    /**
+     * Whether a PropertyType requires the target to be set to null in a separate statement (returns true), or its expression already allows the null case (returns false)
+     *
+     * @return bool True if the type needs a separate statement for the null case
+     */
+    private function typeDeserializesAsExpression(PropertyType $type)
+    {
+        if (!$type->isNullable()) {
+            return false;
+        }
+
+        switch ($type) {
+            case $type instanceof PropertyTypePrimitive:
+            case $type instanceof PropertyTypeUnknown:
+            case $type instanceof PropertyTypeDateTime:
+            case $type instanceof PropertyTypeEnum:
+                return true;
+
+            case $type instanceof PropertyTypeClass:
+                return false;
+
+            case $type instanceof PropertyTypeUnion:
+                foreach ($type->getTypes() as $subType) {
+                    if (!$this->typeDeserializesAsExpression($subType)) {
+                        return false;
+                    }
+                }
+                return true;
+            case $type instanceof PropertyTypeIterable:
+                $subType = $type->getSubType();
+                return ($subType instanceof PropertyTypePrimitive) || ($subType instanceof PropertyTypeUnknown);
+        }
+
+        return false;
     }
 
     /**

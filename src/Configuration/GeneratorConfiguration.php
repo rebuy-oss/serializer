@@ -259,6 +259,7 @@ class GeneratorConfiguration implements \IteratorAggregate
 
                     return $resolver;
                 });
+
                 return $resolver->setDefault('deserialization', static function (OptionsResolver $resolver): OptionsResolver {
                     $resolver->setDefault('null_as_default', true);
                     $resolver->setAllowedTypes('null_as_default', 'bool');

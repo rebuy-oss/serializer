@@ -229,7 +229,7 @@ final class SerializerGenerator
         // thanks to the `if ($shouldSerializeNull && !$requiresExplicitNullSet)`, we know we need an if-else to contain the 2 cases (null and non-null).
         $serializeField = $this->generateCodeForFieldType($nonNullType, $fieldTarget, $modelProperty, $stack, $depth + 1);
 
-        return $this->templating->renderConditional("$modelProperty", $serializeField, $shouldSerializeNull ? $setNull : null);
+        return $this->templating->renderConditional("{$modelProperty}", $serializeField, $shouldSerializeNull ? $setNull : null);
     }
 
     /**

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Liip\Serializer\Path;
 
-use OutOfRangeException;
-
 /**
  * Representation of a model path in PHP, e.g. $model->property1[$index]->property2, used for code generation.
  */
@@ -86,18 +84,22 @@ final class ModelPath implements \Stringable
 
     /**
      * Split an array path into a base and the n steps at the end of its path.
-     * @throws OutOfRangeException if the $steps argument is larger than there are steps in this path
-     * @return array{0: self, 1: non-empty-list<ArrayEntry|ModelEntry>} First element is the stubbed ArrayPath, second element is a list of the last n steps
+     *
+     * @param positive-int $steps Number of steps to remove
+     *
+     * @return array{0: self, 1: non-empty-list<AbstractEntry>} First element is the stubbed ArrayPath, second element is a list of the last n steps
+     *
+     * @throws \OutOfRangeException if the $steps argument is larger than there are steps in this path
      */
     public function splitBack(int $steps = 1): array
     {
         $root = clone $this;
         $rest = [];
 
-        for (; 0 < $steps; $steps--) {
+        for (; 0 < $steps; --$steps) {
             $piece = array_pop($root->path);
             if (null === $piece || $piece instanceof Root) {
-                throw new OutOfRangeException('Not enough steps to split');
+                throw new \OutOfRangeException('Not enough steps to split');
             }
             $rest[] = $piece;
         }

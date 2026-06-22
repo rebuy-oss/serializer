@@ -26,11 +26,21 @@ function {{functionName}}({{className}} $model, bool $useStdClass = true)
 EOT;
 
     private const TMPL_CLASS = <<<'EOT'
+{% if initialValues %}
+{{target}} = [
+{%- for pair in initialValues ~%}
+        {% if pair.splat is defined and pair.splat is not empty %}...({{ pair.splat }}){% else %}{{ pair.key }} => {{ pair.value }}{% endif %},
+{%- endfor ~%}
+    ];
+{% else -%}
 {{target}} = [];
+{% endif -%}
 {{code}}
+{% if withEmptyObject is defined and withEmptyObject %}
 if ([] === {{target}}) {
     {{target}} = $emptyObject;
 }
+{% endif %}
 
 EOT;
 
@@ -131,11 +141,13 @@ EOT;
         ]);
     }
 
-    public function renderClass(string|ModelPath $target, string $code): string
+    public function renderClass(string|ModelPath $target, string $code, array $initialValues = [], bool $withEmptyObject = true): string
     {
         return $this->render(self::TMPL_CLASS, [
             'target' => $target,
             'code' => $code,
+            'initialValues' => $initialValues,
+            'withEmptyObject' => $withEmptyObject,
         ]);
     }
 

@@ -138,21 +138,50 @@ final class SerializerGenerator
         $nestedTarget = $isRootLevel ? $target : ModelPath::inventVariable("{$target}", 'object');
 
         $code = '';
-        foreach ($classMetadata->getProperties() as $propertyMetadata) {
-            $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack, $depth);
-        }
+        if (!$discriminatorMetadata && $this->configuration->shouldSerializeNull()) {
+            $initialValues = [];
+            $remainingProperties = $classMetadata->getProperties();
+            foreach ($remainingProperties as $key => $property) {
+                $type = $property->getType();
+                $modelPropertyPath = $property->getAccessor()->hasGetterMethod()
+                    ? $modelPath->withPath($property->getAccessor()->getGetterMethod() . '()')
+                    : $modelPath->withPath($property->getName());
+                $expression = $this->generateCodeForFieldTypeValue($type, $modelPropertyPath);
+                if (null === $expression || $this->fieldTypeRequiresExplicitNullSet($type)) {
+                    continue;
+                }
 
-        if (null !== $discriminatorMetadata) {
-            $discriminatorFieldTarget = $nestedTarget->withArrayLiteral($discriminatorMetadata->propertyName);
-            $code .= $this->templating->renderAssign($discriminatorFieldTarget, var_export($discriminatorMetadata->value, true));
-        }
+                $serializedName = $property->getSerializedName();
+                $initialValues[$serializedName] = [
+                    'key' => var_export($serializedName, true),
+                    'value' => $expression,
+                    'property' => $property
+                ];
+                unset($remainingProperties[$key]);
+            }
 
-        $built = $this->templating->renderClass($nestedTarget, $code);
-        if ($isRootLevel) {
-            return $built;
-        }
+            foreach ($remainingProperties as $propertyMetadata) {
+                $code .= $this->generateCodeForField($propertyMetadata, $arrayPath, $modelPath, $stack);
+            }
 
-        return $built.$this->templating->renderAssign($target, "{$nestedTarget}");
+            return $this->templating->renderClass($arrayPath, $code, initialValues: $initialValues, withEmptyObject: !$classMetadata->getProperties());
+        } else {
+            foreach ($classMetadata->getProperties() as $propertyMetadata) {
+                $code .= $this->generateCodeForField($propertyMetadata, $target, $modelPath, $stack);
+            }
+
+            if (null !== $discriminatorMetadata) {
+                $discriminatorFieldTarget = $nestedTarget->withArrayLiteral($discriminatorMetadata->propertyName);
+                $code .= $this->templating->renderAssign($discriminatorFieldTarget, var_export($discriminatorMetadata->value, true));
+            }
+
+            $built = $this->templating->renderClass($nestedTarget, $code, withEmptyObject: true);
+            if ($isRootLevel) {
+                return $built;
+            }
+
+            return $built.$this->templating->renderAssign($target, "{$nestedTarget}");
+        }
     }
 
     /**
@@ -294,7 +323,37 @@ final class SerializerGenerator
             case $type instanceof PropertyTypeUnion:
         }
 
-        return false;
+        return true;
+    }
+
+    private function generateCodeForFieldTypeValue(PropertyType $type, ModelPath $modelPropertyPath): ?string
+    {
+        switch ($type) {
+            case $type instanceof PropertyTypeDateTime:
+                $dateFormat = $type->getFormat() ?: \DateTimeInterface::ISO8601;
+
+                return $this->templating->renderDateTime((string) $modelPropertyPath, $dateFormat, $type->isNullable());
+
+            case $type instanceof PropertyTypePrimitive:
+            case $type instanceof PropertyTypeUnknown:
+                // for arrays of scalars, copy the field even when it's an empty array
+                return (string) $modelPropertyPath;
+
+            case $type instanceof PropertyTypeEnum:
+                $valueAccess = $type->shouldSerializeAsValue() ? 'value' : 'name';
+
+                return (string) $modelPropertyPath->withPath($valueAccess, $type->isNullable());
+
+            case $type instanceof PropertyTypeIterable:
+                $leafType = $type->getLeafType();
+                if (($leafType instanceof PropertyTypePrimitive) || ($this->configuration->shouldAllowGenericArrays() && ($leafType instanceof PropertyTypeUnknown))) {
+                    return (string) $modelPropertyPath;
+                }
+
+                return null;
+        }
+
+        return null;
     }
 
     /**
@@ -309,21 +368,11 @@ final class SerializerGenerator
     ): string {
         switch ($type) {
             case $type instanceof PropertyTypeDateTime:
-                $dateFormat = $type->getFormat() ?: \DateTimeInterface::ISO8601;
-                $dateToString = $this->templating->renderDateTime("{$modelPropertyPath}", $dateFormat, $type->isNullable());
-
-                return $this->templating->renderAssign($target, $dateToString);
-
             case $type instanceof PropertyTypePrimitive:
             case $type instanceof PropertyTypeUnknown:
-                // for arrays of scalars, copy the field even when its an empty array
-                return $this->templating->renderAssign($target, "{$modelPropertyPath}");
-
             case $type instanceof PropertyTypeEnum:
-                $valueAccess = $type->shouldSerializeAsValue() ? 'value' : 'name';
-                $propertyAccessor = $modelPropertyPath->withPath($valueAccess, $type->isNullable());
-
-                return $this->templating->renderAssign($target, "{$propertyAccessor}");
+                // for arrays of scalars, copy the field even when it's an empty array
+                return $this->templating->renderAssign($target, $this->generateCodeForFieldTypeValue($type, $modelPropertyPath));
 
             case $type instanceof PropertyTypeClass:
                 return $this->generateCodeForClass($type->getClassMetadata(), $target, $modelPropertyPath, $stack, $depth);

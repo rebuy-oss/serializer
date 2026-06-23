@@ -47,7 +47,12 @@ final class ModelPath implements \Stringable
         $name = '';
 
         foreach ($components as $component) {
-            $name .= ucfirst(preg_replace('/\W+/', '', mb_strtolower($component)));
+            $parts = preg_split('/\W+/', $component);
+            $parts = (false === $parts) ? [$component] : $parts;
+
+            foreach ($parts as $part) {
+                $name .= ucfirst($part);
+            }
         }
 
         return $name;

@@ -225,7 +225,6 @@ final class DeserializerGenerator
             } else {
                 $code = $this->templating->renderDynamicKeyExistsConditional((string) $arrayPathBase, (string) $arrayPathLastKey, "{$getValue}    {$setIntoModel}");
             }
-            $code .= $this->templating->renderUnset([(string) $tempVariable]);
 
             return $code;
         }
@@ -248,7 +247,7 @@ final class DeserializerGenerator
         return $this->templating->renderDynamicKeyExistsConditional(
             (string) $arrayPathBase,
             (string) $arrayPathLastKey,
-            $this->templating->renderIsNullConditional((string) $arrayPath, $deserializeValue, $setNull)
+            $this->templating->renderIsNotNullConditional((string) $arrayPath, $deserializeValue, $setNull)
         );
     }
 
@@ -265,7 +264,15 @@ final class DeserializerGenerator
             case $type instanceof PropertyTypeEnum:
                 return true;
             case $type instanceof PropertyTypeDateTime:
-                return (bool) ($type->getDeserializeFormats() ?: $type->getFormat());
+                $formats = $type->getDeserializeFormats() ?: $type->getFormat();
+                if (!$formats) {
+                    return true;
+                }
+                if ((\is_string($formats) || (1 === \count($formats))) && !$type->isNullable()) {
+                    return true;
+                }
+
+                return false;
 
             case $type instanceof PropertyTypeIterable:
                 $subType = $type->getLeafType();

@@ -138,13 +138,13 @@ final class SerializerGenerator
         $nestedTarget = $isRootLevel ? $target : ModelPath::inventVariable("{$target}", 'object');
 
         $code = '';
-        if (!$discriminatorMetadata && $this->configuration->shouldSerializeNull()) {
+        if ($this->configuration->shouldSerializeNull() && !$discriminatorMetadata) {
             $initialValues = [];
             $remainingProperties = $classMetadata->getProperties();
             foreach ($remainingProperties as $key => $property) {
                 $type = $property->getType();
                 $modelPropertyPath = $property->getAccessor()->hasGetterMethod()
-                    ? $modelPath->withPath($property->getAccessor()->getGetterMethod() . '()')
+                    ? $modelPath->withPath($property->getAccessor()->getGetterMethod().'()')
                     : $modelPath->withPath($property->getName());
                 $expression = $this->generateCodeForFieldTypeValue($type, $modelPropertyPath);
                 if (null === $expression || $this->fieldTypeRequiresExplicitNullSet($type)) {
@@ -155,33 +155,32 @@ final class SerializerGenerator
                 $initialValues[$serializedName] = [
                     'key' => var_export($serializedName, true),
                     'value' => $expression,
-                    'property' => $property
+                    'property' => $property,
                 ];
                 unset($remainingProperties[$key]);
             }
 
             foreach ($remainingProperties as $propertyMetadata) {
-                $code .= $this->generateCodeForField($propertyMetadata, $arrayPath, $modelPath, $stack);
+                $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack);
             }
 
-            return $this->templating->renderClass($arrayPath, $code, initialValues: $initialValues, withEmptyObject: !$classMetadata->getProperties());
-        } else {
-            foreach ($classMetadata->getProperties() as $propertyMetadata) {
-                $code .= $this->generateCodeForField($propertyMetadata, $target, $modelPath, $stack);
-            }
-
-            if (null !== $discriminatorMetadata) {
-                $discriminatorFieldTarget = $nestedTarget->withArrayLiteral($discriminatorMetadata->propertyName);
-                $code .= $this->templating->renderAssign($discriminatorFieldTarget, var_export($discriminatorMetadata->value, true));
-            }
-
-            $built = $this->templating->renderClass($nestedTarget, $code, withEmptyObject: true);
-            if ($isRootLevel) {
-                return $built;
-            }
-
-            return $built.$this->templating->renderAssign($target, "{$nestedTarget}");
+            return $this->templating->renderClass($nestedTarget, $code, initialValues: $initialValues, withEmptyObject: !$classMetadata->getProperties());
         }
+        foreach ($classMetadata->getProperties() as $propertyMetadata) {
+            $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack);
+        }
+
+        if ($discriminatorMetadata) {
+            $discriminatorFieldTarget = $nestedTarget->withArrayLiteral($discriminatorMetadata->propertyName);
+            $code .= $this->templating->renderAssign($discriminatorFieldTarget, var_export($discriminatorMetadata->value, true));
+        }
+
+        $built = $this->templating->renderClass($nestedTarget, $code, withEmptyObject: true);
+        if ($isRootLevel) {
+            return $built;
+        }
+
+        return $built.$this->templating->renderAssign($target, "{$nestedTarget}");
     }
 
     /**
@@ -233,8 +232,7 @@ final class SerializerGenerator
         }
 
         if ($propertyMetadata->getAccessor()->hasGetterMethod()) {
-            $tempVariable = ModelPath::tempVariable(["{$modelPath}", ucfirst($propertyMetadata->getName())]);
-            // $value = $this->templating->renderGetter("$modelPath", $propertyMetadata->getAccessor()->getGetterMethod());
+            $tempVariable = ModelPath::tempVariable([(string) $modelPath, ucfirst($propertyMetadata->getName())]);
             $value = $modelPath->withPath($propertyMetadata->getAccessor()->getGetterMethod().'()');
 
             if ($shouldSerializeNull && !$requiresExplicitNullSet) {
@@ -247,6 +245,7 @@ final class SerializerGenerator
                 $setNull
             );
         }
+
         if (!$propertyMetadata->isPublic()) {
             throw new \Exception(\sprintf('Property %s is not public and no getter has been defined. Stack %s', $modelProperty, var_export($stack, true)));
         }
@@ -258,7 +257,7 @@ final class SerializerGenerator
         // thanks to the `if ($shouldSerializeNull && !$requiresExplicitNullSet)`, we know we need an if-else to contain the 2 cases (null and non-null).
         $serializeField = $this->generateCodeForFieldType($nonNullType, $fieldTarget, $modelProperty, $stack, $depth + 1);
 
-        return $this->templating->renderConditional("{$modelProperty}", $serializeField, $shouldSerializeNull ? $setNull : null);
+        return $this->templating->renderConditional((string) $modelProperty, $serializeField, $shouldSerializeNull ? $setNull : null);
     }
 
     /**

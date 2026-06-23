@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Liip\Serializer\Template;
 
+use Liip\Serializer\Path\ModelPath;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
 
@@ -102,7 +103,6 @@ EOT;
 
     private const TMPL_ASSIGN_JSON_DATA_TO_FIELD = <<<'EOT'
 {{modelPath}} = {{jsonPath}};
-
 EOT;
 
     private const TMPL_ASSIGN_JSON_DATA_TO_FIELD_CASTING = <<<'EOT'
@@ -111,23 +111,28 @@ EOT;
 EOT;
 
     private const TMPL_ASSIGN_DATETIME_TO_FIELD = <<<'EOT'
-{{modelPath}} = new {{dateClass}}({{jsonPath}});
+{{modelPath}} = {% if nullCheck ?? false -%}(null === {{jsonPath}}) ? null : {% endif %}new {{dateClass}}({{jsonPath}});
 
 EOT;
 
     private const TMPL_ASSIGN_DATETIME_FROM_FORMAT = <<<'EOT'
-{% if not formats %}
-{{varDate}} = false;
-{% endif %}
-{% for format in formats %}
-{{ loop.first ? '' : ' else'}} if (({{varDate}} = {{dateClass}}::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
+{% if (1 === (formats|length)) and not nullCheck ?? false %}
+    {{modelPath}} = {{dateClass}}::createFromFormat({{formats|first}}, {{jsonPath}}, {{timezone}}) ?: throw new \Exception('Invalid datetime string '.({{jsonPath}}).' matches none of the deserialization formats: '.{{formatsError}});
+{% else %}
+{% if not formats %}{{varDate}} = false;{% endif ~%}
+{% if nullCheck %}
+if (null === {{jsonPath}}) {
+    {{modelPath}} = null;
+}
+{%- endif %}
+{% for format in formats -%}
+{{ (loop.first or nullCheck) ? '' : ' else '-}} if (({{varDate}} = {{dateClass}}::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
     {{modelPath}} = {{varDate}};
 }
-{% endfor %}
-{{ formats ? ' else ' : "if (false === #{varDate}})" }} {
+{%- endfor %}{{ formats ? ' else' : "if (false === #{varDate}})" }} {
     throw new \Exception('Invalid datetime string '.({{jsonPath}}).' matches none of the deserialization formats: '.{{formatsError}});
 }
-unset({{varDate}});
+{% endif %}
 
 EOT;
 
@@ -283,7 +288,7 @@ EOT;
         ]);
     }
 
-    public function renderIsNullConditional(string $jsonPath, string $code, ?string $elseCode): string
+    public function renderIsNotNullConditional(string $jsonPath, string $code, ?string $elseCode): string
     {
         return $this->render(self::TMPL_IS_NULL_CONDITIONAL, [
             'jsonPath' => $jsonPath,
@@ -348,11 +353,8 @@ EOT;
             $formats
         );
         $formatsError = var_export(implode(',', $formats), true);
-        $dateVariable = preg_replace_callback(
-            '/([^a-zA-Z]+|\d+)([a-zA-Z])/',
-            static fn ($match): string => (ctype_digit($match[1]) ? $match[1] : null).mb_strtoupper($match[2]),
-            $modelPath
-        ).'Date';
+        $varDate = ModelPath::inventVariable("{$modelPath}Date", 'tempDt');
+        $varFormat = ModelPath::inventVariable("{$modelPath}Date", 'tempFormat');
 
         return $this->render(self::TMPL_ASSIGN_DATETIME_FROM_FORMAT, [
             'modelPath' => $modelPath,
@@ -360,8 +362,8 @@ EOT;
             'formats' => $formats,
             'formatsError' => $formatsError,
             'dateClass' => $dateClass,
-            'varFormat' => '$'.lcfirst($dateVariable).'Format',
-            'varDate' => '$'.lcfirst($dateVariable),
+            'varFormat' => (string) $varFormat,
+            'varDate' => (string) $varDate,
             'timezone' => $timezone ? 'new \DateTimeZone('.var_export($timezone, true).')' : 'null',
             'nullCheck' => $nullCheck,
         ]);

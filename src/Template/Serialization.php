@@ -141,6 +141,13 @@ EOT;
         ]);
     }
 
+    /**
+     * @phpstan-param array<array{
+     *     "key": string|null,
+     *     "value": string,
+     *     "splat"?: string|null,
+     * }> $initialValues
+     */
     public function renderClass(string|ModelPath $target, string $code, array $initialValues = [], bool $withEmptyObject = true): string
     {
         return $this->render(self::TMPL_CLASS, [

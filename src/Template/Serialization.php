@@ -16,14 +16,7 @@ function {{functionName}}({{className}} $model, bool $useStdClass = true)
 {
     $emptyHashmap = $useStdClass ? new \stdClass() : [];
     $emptyObject = $useStdClass ? new \stdClass() : [];
-    $isPrimitive = function (mixed $data) {
-        if (is_array($data)) {
-            return false;
-        }
 
-        return null === $data || is_scalar($data);
-    };
-    
     {{code}}
 
     return $jsonData;
@@ -69,7 +62,7 @@ if ({{propertyAccessor}} instanceof {{class}}) {
 EOT;
 
     private const TMPL_PRIMITIVE_CONDITIONAL = <<<'EOT'
-if ($isPrimitive({{propertyAccessor}})) {
+if (\Liip\Serializer\SerializerGenerator::isPrimitive({{propertyAccessor}})) {
     {{code}}
 }
 EOT;

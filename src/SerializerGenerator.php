@@ -105,7 +105,7 @@ final class SerializerGenerator
         $code = $this->templating->renderFunction(
             $functionName,
             $className,
-            $this->generateCodeForClass($classMetadata, $apiVersion, $serializerGroups, '$jsonData', '$model')
+            $this->generateCodeForClass($classMetadata, '$jsonData', '$model')
         );
 
         $this->filesystem->dumpFile(\sprintf('%s/%s.php', $this->cacheDirectory, $functionName), $code);
@@ -117,8 +117,6 @@ final class SerializerGenerator
      */
     private function generateCodeForClass(
         ClassMetadata $classMetadata,
-        ?string $apiVersion,
-        array $serializerGroups,
         string $target,
         string $modelPath,
         array $stack = [],
@@ -132,7 +130,7 @@ final class SerializerGenerator
 
         $discriminatorMetadata = $classMetadata->getDiscriminatorMetadata();
         if (null !== $discriminatorMetadata && $discriminatorMetadata->baseClass == $className) {
-            return $this->generateCodeForDiscriminatorClass($classMetadata, $apiVersion, $serializerGroups, $target, $modelPath, $stack, $depth);
+            return $this->generateCodeForDiscriminatorClass($classMetadata, $target, $modelPath, $stack, $depth);
         }
 
         $stack[$className] = ($stack[$className] ?? 0) + 1;
@@ -142,7 +140,7 @@ final class SerializerGenerator
 
         $code = '';
         foreach ($classMetadata->getProperties() as $propertyMetadata) {
-            $code .= $this->generateCodeForField($propertyMetadata, $apiVersion, $serializerGroups, $nestedTarget, $modelPath, $stack, $depth);
+            $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack, $depth);
         }
 
         if (null !== $discriminatorMetadata) {
@@ -164,8 +162,6 @@ final class SerializerGenerator
      */
     private function generateCodeForDiscriminatorClass(
         ClassMetadata $classMetadata,
-        ?string $apiVersion,
-        array $serializerGroups,
         string $target,
         string $modelPath,
         array $stack = [],
@@ -177,7 +173,7 @@ final class SerializerGenerator
             $code .= $this->templating->renderInstanceOfConditional(
                 $modelPath,
                 $class,
-                $this->generateCodeForClass($discriminatorMetadata->getMetadataForClass($class), $apiVersion, $serializerGroups, $target, $modelPath, $stack, $depth)
+                $this->generateCodeForClass($discriminatorMetadata->getMetadataForClass($class), $target, $modelPath, $stack, $depth)
             );
         }
 
@@ -190,8 +186,6 @@ final class SerializerGenerator
      */
     private function generateCodeForField(
         PropertyMetadata $propertyMetadata,
-        ?string $apiVersion,
-        array $serializerGroups,
         string $target,
         string $modelPath,
         array $stack,
@@ -217,7 +211,7 @@ final class SerializerGenerator
             $value = $this->templating->renderGetter($modelPath, $propertyMetadata->getAccessor()->getGetterMethod());
 
             if ($shouldSerializeNull && !$requiresExplicitNullSet) {
-                return $this->generateCodeForFieldType($type, $apiVersion, $serializerGroups, $fieldTarget, $value, $stack)."\n";
+                return $this->generateCodeForFieldType($type, $fieldTarget, $value, $stack)."\n";
             }
 
             // the conditional is a null check, so the remaining expressions can assume non-null types
@@ -225,7 +219,7 @@ final class SerializerGenerator
 
             return $this->templating->renderConditional(
                 $this->templating->renderTempVariable($tempVariable, $value),
-                $this->generateCodeForFieldType($nonNullType, $apiVersion, $serializerGroups, $fieldTarget, '$'.$tempVariable, $stack, $depth + 1),
+                $this->generateCodeForFieldType($nonNullType, $fieldTarget, '$'.$tempVariable, $stack, $depth + 1),
                 $setNull
             );
         }
@@ -233,7 +227,7 @@ final class SerializerGenerator
             throw new \Exception(\sprintf('Property %s is not public and no getter has been defined. Stack %s', $modelPropertyPath, var_export($stack, true)));
         }
 
-        $serializeField = $this->generateCodeForFieldType($type, $apiVersion, $serializerGroups, $fieldTarget, $modelPropertyPath, $stack, $depth + 1);
+        $serializeField = $this->generateCodeForFieldType($type, $fieldTarget, $modelPropertyPath, $stack, $depth + 1);
 
         if (!$shouldSerializeNull) {
             return $this->templating->renderConditional($modelPropertyPath, $serializeField);
@@ -315,8 +309,6 @@ final class SerializerGenerator
      */
     private function generateCodeForFieldType(
         PropertyType $type,
-        ?string $apiVersion,
-        array $serializerGroups,
         string $target,
         string $modelPropertyPath,
         array $stack,
@@ -341,13 +333,13 @@ final class SerializerGenerator
                 return $this->templating->renderAssign($target, $modelPropertyPath.$valueAccess);
 
             case $type instanceof PropertyTypeClass:
-                return $this->generateCodeForClass($type->getClassMetadata(), $apiVersion, $serializerGroups, $target, $modelPropertyPath, $stack, $depth);
+                return $this->generateCodeForClass($type->getClassMetadata(), $target, $modelPropertyPath, $stack, $depth);
 
             case $type instanceof PropertyTypeIterable:
-                return $this->generateCodeForArray($type, $apiVersion, $serializerGroups, $target, $modelPropertyPath, $stack, $depth);
+                return $this->generateCodeForArray($type, $target, $modelPropertyPath, $stack, $depth);
 
             case $type instanceof PropertyTypeUnion:
-                return $this->generateCodeForUnion($type, $apiVersion, $serializerGroups, $target, $modelPropertyPath, $stack, $depth);
+                return $this->generateCodeForUnion($type, $target, $modelPropertyPath, $stack, $depth);
 
             default:
                 throw new \Exception('Unexpected type '.$type::class.' at '.$modelPropertyPath);
@@ -360,8 +352,6 @@ final class SerializerGenerator
      */
     private function generateCodeForArray(
         PropertyTypeIterable $type,
-        ?string $apiVersion,
-        array $serializerGroups,
         string $target,
         string $modelPath,
         array $stack,
@@ -384,15 +374,15 @@ final class SerializerGenerator
 
         switch ($subType) {
             case $subType instanceof PropertyTypeIterable:
-                $innerCode = $this->generateCodeForArray($subType, $apiVersion, $serializerGroups, $itemTarget, $value, $stack, $depth + 1);
+                $innerCode = $this->generateCodeForArray($subType, $itemTarget, $value, $stack, $depth + 1);
                 break;
 
             case $subType instanceof PropertyTypeEnum:
-                $innerCode = $this->generateCodeForFieldType($subType, $apiVersion, $serializerGroups, $itemTarget, $value, $stack, $depth + 1);
+                $innerCode = $this->generateCodeForFieldType($subType, $itemTarget, $value, $stack, $depth + 1);
                 break;
 
             case $subType instanceof PropertyTypeClass:
-                $innerCode = $this->generateCodeForClass($subType->getClassMetadata(), $apiVersion, $serializerGroups, $itemTarget, $value, $stack, $depth + 1);
+                $innerCode = $this->generateCodeForClass($subType->getClassMetadata(), $itemTarget, $value, $stack, $depth + 1);
                 break;
 
             default:
@@ -427,8 +417,6 @@ final class SerializerGenerator
      */
     private function generateCodeForUnion(
         PropertyTypeUnion $subType,
-        ?string $apiVersion,
-        array $serializerGroups,
         string $target,
         string $modelPath,
         array $stack,
@@ -455,18 +443,39 @@ final class SerializerGenerator
                     $code .= $this->templating->renderInstanceOfConditional(
                         $modelPath,
                         $subType->getClassName(),
-                        $this->generateCodeForFieldType($subType, $apiVersion, $serializerGroups, $target, $modelPath, $stack, $depth)
+                        $this->generateCodeForFieldType($subType, $target, $modelPath, $stack, $depth)
                     );
                     break;
                 case PropertyTypeIterable::class:
                     $code .= $this->templating->renderArrayConditional(
                         $modelPath,
-                        $this->generateCodeForArray($subType, $apiVersion, $serializerGroups, $target, $modelPath, $stack, $depth)
+                        $this->generateCodeForArray($subType, $target, $modelPath, $stack, $depth)
                     );
                     break;
             }
         }
 
         return $code;
+    }
+
+    public static function isPrimitive(mixed $data): bool
+    {
+        if (\is_array($data)) {
+            return false;
+        }
+
+        return null === $data || \is_scalar($data);
+    }
+
+    private static function isArrayForPrimitive(PropertyTypeIterable $type): bool
+    {
+        do {
+            $type = $type->getSubType();
+            if ($type instanceof PropertyTypePrimitive) {
+                return true;
+            }
+        } while ($type instanceof PropertyTypeIterable);
+
+        return false;
     }
 }

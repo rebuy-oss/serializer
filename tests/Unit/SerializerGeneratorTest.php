@@ -562,7 +562,7 @@ class SerializerGeneratorTest extends SerializerTestCase
         ];
         $data = $functionName($model);
 
-        self::assertSame($expected, $data);
+        self::assertEqualsCanonicalizing($expected, $data);
     }
 
     public function testComplexUnionDiscriminator(): void

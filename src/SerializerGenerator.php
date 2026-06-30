@@ -128,6 +128,7 @@ final class SerializerGenerator
         }
 
         $discriminatorMetadata = $classMetadata->getDiscriminatorMetadata();
+        $properties = $classMetadata->getProperties();
         if ($discriminatorMetadata && $discriminatorMetadata->baseClass == $className) {
             return $this->generateCodeForDiscriminatorClass($classMetadata, $target, $modelPath, $stack, $depth);
         }
@@ -138,18 +139,15 @@ final class SerializerGenerator
         $nestedTarget = $isRootLevel ? $target : ModelPath::inventVariable("{$target}", 'object');
 
         $code = '';
+        $initialValues = [];
+        if ($discriminatorMetadata) {
+            $initialValues[$discriminatorMetadata->propertyName] = [
+                'key' => var_export($discriminatorMetadata->propertyName, true),
+                'value' => var_export($discriminatorMetadata->value, true),
+            ];
+        }
         if ($this->configuration->shouldSerializeNull()) {
-            $initialValues = [];
-            $remainingProperties = $classMetadata->getProperties();
-
-            if ($discriminatorMetadata) {
-                $initialValues[$discriminatorMetadata->propertyName] = [
-                    'key' => var_export($discriminatorMetadata->propertyName, true),
-                    'value' => var_export($discriminatorMetadata->value, true),
-                ];
-            }
-
-            foreach ($remainingProperties as $key => $property) {
+            foreach ($properties as $key => $property) {
                 $type = $property->getType();
                 $modelPropertyPath = $property->getAccessor()->hasGetterMethod()
                     ? $modelPath->withPath($property->getAccessor()->getGetterMethod().'()')
@@ -164,25 +162,15 @@ final class SerializerGenerator
                     'key' => var_export($serializedName, true),
                     'value' => $expression,
                 ];
-                unset($remainingProperties[$key]);
+                unset($properties[$key]);
             }
-
-            foreach ($remainingProperties as $propertyMetadata) {
-                $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack);
-            }
-
-            return $this->templating->renderClass($nestedTarget, $code, initialValues: $initialValues, withEmptyObject: !$classMetadata->getProperties());
         }
-        foreach ($classMetadata->getProperties() as $propertyMetadata) {
+        foreach ($properties as $propertyMetadata) {
             $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack);
         }
 
-        if ($discriminatorMetadata) {
-            $discriminatorFieldTarget = $nestedTarget->withArrayLiteral($discriminatorMetadata->propertyName);
-            $code .= $this->templating->renderAssign($discriminatorFieldTarget, var_export($discriminatorMetadata->value, true));
-        }
-
-        $built = $this->templating->renderClass($nestedTarget, $code, withEmptyObject: true);
+        $mightBeEmpty = !$this->configuration->shouldSerializeNull() || !$classMetadata->getProperties();
+        $built = $this->templating->renderClass($nestedTarget, $code, initialValues: $initialValues, withEmptyObject: $mightBeEmpty);
         if ($isRootLevel) {
             return $built;
         }

@@ -12,7 +12,7 @@ abstract class AbstractEntry implements \Stringable
 
     abstract public function __toString(): string;
 
-    protected function getPath(): string
+    public function getPath(): string
     {
         return $this->path;
     }

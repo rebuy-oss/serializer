@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Liip\Serializer\Template;
 
+use Liip\Serializer\Path\ModelPath;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
 
@@ -16,14 +17,7 @@ function {{functionName}}({{className}} $model, bool $useStdClass = true)
 {
     $emptyHashmap = $useStdClass ? new \stdClass() : [];
     $emptyObject = $useStdClass ? new \stdClass() : [];
-    $isPrimitive = function (mixed $data) {
-        if (is_array($data)) {
-            return false;
-        }
 
-        return null === $data || is_scalar($data);
-    };
-    
     {{code}}
 
     return $jsonData;
@@ -32,11 +26,21 @@ function {{functionName}}({{className}} $model, bool $useStdClass = true)
 EOT;
 
     private const TMPL_CLASS = <<<'EOT'
+{% if initialValues %}
+{{target}} = [
+{%- for pair in initialValues ~%}
+        {% if pair.splat is defined and pair.splat is not empty %}...({{ pair.splat }}){% else %}{{ pair.key }} => {{ pair.value }}{% endif %},
+{%- endfor ~%}
+    ];
+{% else -%}
 {{target}} = [];
+{% endif -%}
 {{code}}
+{% if withEmptyObject is defined and withEmptyObject %}
 if ([] === {{target}}) {
     {{target}} = $emptyObject;
 }
+{% endif %}
 
 EOT;
 
@@ -50,6 +54,7 @@ else {
 }
 {% endif %}
 
+
 EOT;
 
     private const TMPL_INSTANCE_OF_CONDITIONAL = <<<'EOT'
@@ -60,13 +65,13 @@ if ({{propertyAccessor}} instanceof {{class}}) {
 EOT;
 
     private const TMPL_PRIMITIVE_CONDITIONAL = <<<'EOT'
-if ($isPrimitive({{propertyAccessor}})) {
+if (\Liip\Serializer\SerializerGenerator::isPrimitive({{propertyAccessor}})) {
     {{code}}
 }
 EOT;
 
     private const TMPL_ARRAY_CONDITIONAL = <<<'EOT'
-if (is_array({{propertyAccessor}})) {
+if (\is_array({{propertyAccessor}})) {
     {{code}}
 }
 EOT;
@@ -76,14 +81,14 @@ EOT;
 EOT;
 
     private const TMPL_ARRAY_ASSIGN = <<<'EOT'
-{{target}} = is_array({{propertyAccessor}}) ? {{propertyAccessor}} : iterator_to_array({{propertyAccessor}});
+{{target}} = \is_array({{propertyAccessor}}) ? {{propertyAccessor}} : \iterator_to_array({{propertyAccessor}});
 EOT;
 
     private const TMPL_HASHMAP = <<<'EOT'
 if (0 === \count({{arrayVariable}})) {
     {{target}} = $emptyHashmap;
 } else {
-    {{target}} = array_is_list({{arrayVariable}}) ? new \ArrayObject({{arrayVariable}}) : {{arrayVariable}};
+    {{target}} = \array_is_list({{arrayVariable}}) ? new \ArrayObject({{arrayVariable}}) : {{arrayVariable}};
 }
 EOT;
 
@@ -107,9 +112,9 @@ EOT;
 
     private const TMPL_GETTER = '{{modelPath}}->{{method}}()';
 
-    private const TMPL_DATETIME = '{{propertyPath}}{{ nullable ? "?" : "" }}->format(\'{{format}}\')';
+    private const TMPL_DATETIME = '{{propertyPath}}{{ nullable ? "?" : "" }}->format({{format}})';
 
-    private const TMPL_TEMP_VAR = '${{name}} = {{value}}';
+    private const TMPL_TEMP_VAR = '{{name}} = {{value}}';
 
     private Environment $twig;
 
@@ -127,11 +132,20 @@ EOT;
         ]);
     }
 
-    public function renderClass(string $target, string $code): string
+    /**
+     * @phpstan-param array<array{
+     *     "key": string|null,
+     *     "value": string,
+     *     "splat"?: string|null,
+     * }> $initialValues
+     */
+    public function renderClass(string|ModelPath $target, string $code, array $initialValues = [], bool $withEmptyObject = true): string
     {
         return $this->render(self::TMPL_CLASS, [
             'target' => $target,
             'code' => $code,
+            'initialValues' => $initialValues,
+            'withEmptyObject' => $withEmptyObject,
         ]);
     }
 
@@ -144,7 +158,7 @@ EOT;
         ]);
     }
 
-    public function renderInstanceOfConditional(string $propertyAccessor, string $class, string $code): string
+    public function renderInstanceOfConditional(string|ModelPath $propertyAccessor, string $class, string $code): string
     {
         return $this->render(self::TMPL_INSTANCE_OF_CONDITIONAL, [
             'propertyAccessor' => $propertyAccessor,
@@ -153,7 +167,7 @@ EOT;
         ]);
     }
 
-    public function renderPrimitiveConditional(string $propertyAccessor, string $code): string
+    public function renderPrimitiveConditional(string|ModelPath $propertyAccessor, string $code): string
     {
         return $this->render(self::TMPL_PRIMITIVE_CONDITIONAL, [
             'propertyAccessor' => $propertyAccessor,
@@ -161,7 +175,7 @@ EOT;
         ]);
     }
 
-    public function renderArrayConditional(string $propertyAccessor, string $code): string
+    public function renderArrayConditional(string|ModelPath $propertyAccessor, string $code): string
     {
         return $this->render(self::TMPL_ARRAY_CONDITIONAL, [
             'propertyAccessor' => $propertyAccessor,
@@ -169,7 +183,7 @@ EOT;
         ]);
     }
 
-    public function renderAssign(string $target, string $propertyAccessor): string
+    public function renderAssign(string|ModelPath $target, string $propertyAccessor): string
     {
         return $this->render(self::TMPL_ASSIGN, [
             'target' => $target,
@@ -177,7 +191,7 @@ EOT;
         ]);
     }
 
-    public function renderArrayAssign(string $target, string $propertyAccessor): string
+    public function renderArrayAssign(string|ModelPath $target, string $propertyAccessor): string
     {
         return $this->render(self::TMPL_ARRAY_ASSIGN, [
             'target' => $target,
@@ -185,7 +199,7 @@ EOT;
         ]);
     }
 
-    public function renderLoopArray(string $target, string $propertyAccessor, string $indexVariable, string $valueVariable, string $code): string
+    public function renderLoopArray(string|ModelPath $target, string|ModelPath $propertyAccessor, string|ModelPath $indexVariable, string|ModelPath $valueVariable, string $code): string
     {
         return $this->render(self::TMPL_LOOP_ARRAY, [
             'target' => $target,
@@ -196,14 +210,14 @@ EOT;
         ]);
     }
 
-    public function renderLoopArrayEmpty(string $target): string
+    public function renderLoopArrayEmpty(string|ModelPath $target): string
     {
         return $this->render(self::TMPL_LOOP_ARRAY_EMPTY, [
             'target' => $target,
         ]);
     }
 
-    public function renderHashmap(string $target, string $arrayVariable): string
+    public function renderHashmap(string|ModelPath $target, string|ModelPath $arrayVariable): string
     {
         return $this->render(self::TMPL_HASHMAP, [
             'target' => $target,
@@ -211,7 +225,7 @@ EOT;
         ]);
     }
 
-    public function renderLoopHashmapEmpty(string $target): string
+    public function renderLoopHashmapEmpty(string|ModelPath $target): string
     {
         return $this->render(self::TMPL_HASHMAP_EMPTY, [
             'target' => $target,
@@ -230,12 +244,12 @@ EOT;
     {
         return $this->render(self::TMPL_DATETIME, [
             'propertyPath' => $propertyPath,
-            'format' => $format,
+            'format' => var_export($format, true),
             'nullable' => $nullable,
         ]);
     }
 
-    public function renderTempVariable(string $name, string $value): string
+    public function renderTempVariable(string|ModelPath $name, string $value): string
     {
         return $this->render(self::TMPL_TEMP_VAR, [
             'name' => $name,
@@ -243,10 +257,10 @@ EOT;
         ]);
     }
 
-    public function renderConditionalUsingTempVariable(string $tempVariable, string $propertyAccessor, string $code): string
+    public function renderConditionalUsingTempVariable(string|ModelPath $tempVariable, string|ModelPath $propertyAccessor, string $code): string
     {
         return $this->render(self::TMPL_CONDITIONAL, [
-            'condition' => $this->renderTempVariable($tempVariable, $propertyAccessor),
+            'condition' => $this->renderTempVariable("{$tempVariable}", "{$propertyAccessor}"),
             'code' => $code,
         ]);
     }
@@ -259,5 +273,15 @@ EOT;
         $tmpl = $this->twig->createTemplate($template);
 
         return $tmpl->render($parameters);
+    }
+
+    public static function varJsonPath(): ModelPath
+    {
+        return new ModelPath('jsonData');
+    }
+
+    public static function varModel(): ModelPath
+    {
+        return new ModelPath('model');
     }
 }

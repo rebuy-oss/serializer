@@ -19,6 +19,7 @@ use Tests\Liip\Serializer\Fixtures\ComplexUnionTyping;
 use Tests\Liip\Serializer\Fixtures\ContainsNonEmptyConstructor;
 use Tests\Liip\Serializer\Fixtures\CustomType;
 use Tests\Liip\Serializer\Fixtures\CustomTypeHandler;
+use Tests\Liip\Serializer\Fixtures\DefaultValues;
 use Tests\Liip\Serializer\Fixtures\DiscriminatorAuthor;
 use Tests\Liip\Serializer\Fixtures\DiscriminatorComment;
 use Tests\Liip\Serializer\Fixtures\DiscriminatorDependency;
@@ -482,5 +483,33 @@ class DeserializerGeneratorTest extends SerializerTestCase
         self::assertContainsOnlyInstancesOf(CustomType::class, $model->values);
         self::assertSame('foo', $model->values[0]->getValue());
         self::assertSame('bar', $model->values[1]->getValue());
+    }
+
+    public function testNullsAreNotLeftOut(): void
+    {
+        $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_DefaultValues';
+        self::generateDeserializer(self::$metadataBuilder, DefaultValues::class, $functionName, ['generation' => [
+            'deserialization' => ['null_as_default' => false],
+        ]]);
+
+        $input = [
+            'list' => null,
+            'nested' => null,
+            'createdAt' => null,
+            'updatedAt' => null,
+            'plannedFor' => null,
+            'stringEnum' => null,
+        ];
+
+        /** @var DefaultValues $model */
+        $model = $functionName($input);
+
+        self::assertNull($model->list, "Input set DefaultValues::list to null, the model's property should not be the default empty array.");
+        self::assertTrue((new \ReflectionProperty($model, 'nested'))->isInitialized($model), "Input set DefaultValues::nested to null, the model's property should not be unset");
+        self::assertNull($model->nested);
+        self::assertNull($model->createdAt);
+        self::assertNull($model->updatedAt);
+        self::assertNull($model->plannedFor);
+        self::assertNull($model->stringEnum);
     }
 }

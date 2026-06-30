@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace Liip\Serializer\Template;
 
+use Liip\Serializer\Path\ModelPath;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
 
 final class Deserialization
 {
     private const PRIMITIVE_CHECKS = [
-        'null' => 'is_null({{value}})',
-        'array' => 'is_array({{value}})',
+        'null' => '\is_null({{value}})',
+        'array' => '\is_array({{value}})',
         'int' => '(string) (int) {{value}} === (string) {{value}}',
         'float' => '(string) (float) {{value}} === (string) {{value}}',
         'bool' => '!is_array({{value}}) && (string) (bool) {{value}} === (string) {{value}}',
         'true' => 'true === {{value}}',
         'false' => 'false === {{value}}',
-        'string' => '!is_array({{value}}) && !is_object({{value}})',
+        'string' => '!\is_array({{value}}) && !\is_object({{value}})',
     ];
 
     private const PRIMITIVE_CASTS = [
@@ -49,8 +50,9 @@ EOT;
 
     private const TMPL_ARGUMENT = <<<'EOT'
 {{variableName}} = {{default}};
+{%- if code is not null ~%}
 {{code}}
-
+{%- endif -%}
 EOT;
 
     private const TMPL_POST_METHOD = <<<'EOT'
@@ -79,55 +81,58 @@ if ({{typeConditional}}) {
 
 EOT;
 
-    private const TMPL_ASSIGN_JSON_DATA_TO_FIELD = <<<'EOT'
-{{modelPath}} = {{jsonPath}};
+    private const TMPL_KEY_EXISTS_CONDITIONAL = <<<'EOT'
+if (\array_key_exists({{index}}, {{data}})) {
+    {{code}}
+} {% if elseCode is not null %} else {
+    {{ elseCode }}
+}{% endif %}
+
 
 EOT;
 
+    private const TMPL_IS_NULL_CONDITIONAL = <<<'EOT'
+if (null !== {{jsonPath}}) {
+    {{code}}
+} {% if elseCode is not null %} else {
+    {{ elseCode }}
+}{% endif %}
+
+
+EOT;
+
+    private const TMPL_ASSIGN_JSON_DATA_TO_FIELD = <<<'EOT'
+{{modelPath}} = {{jsonPath}};
+EOT;
+
     private const TMPL_ASSIGN_JSON_DATA_TO_FIELD_CASTING = <<<'EOT'
-{{modelPath}} = ({{type}}) {{jsonPath}};
+{{modelPath}} = {% if nullCheck ?? false -%}(null === {{jsonPath}}) ? null : {% endif %}({{type}}) {{jsonPath}};
 
 EOT;
 
     private const TMPL_ASSIGN_DATETIME_TO_FIELD = <<<'EOT'
-{{modelPath}} = new \DateTime({{jsonPath}});
+{{modelPath}} = {% if nullCheck ?? false -%}(null === {{jsonPath}}) ? null : {% endif %}new {{dateClass}}({{jsonPath}});
 
 EOT;
 
     private const TMPL_ASSIGN_DATETIME_FROM_FORMAT = <<<'EOT'
-{{date}} = false;
-foreach([{{formats|join(', ')}}] as {{format}}) {
-    if (({{date}} = \DateTime::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
-        {{modelPath}} = {{date}};
-        break;
-    }
+{% if (1 === (formats|length)) and not nullCheck ?? false %}
+    {{modelPath}} = {{dateClass}}::createFromFormat({{formats|first}}, {{jsonPath}}, {{timezone}}) ?: throw new \Exception('Invalid datetime string '.({{jsonPath}}).' matches none of the deserialization formats: '.{{formatsError}});
+{% else %}
+{% if not formats %}{{varDate}} = false;{% endif ~%}
+{% if nullCheck %}
+if (null === {{jsonPath}}) {
+    {{modelPath}} = null;
 }
-
-if (false === {{date}}) {
+{%- endif %}
+{% for format in formats -%}
+{{ (loop.first or nullCheck) ? '' : ' else '-}} if (({{varDate}} = {{dateClass}}::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
+    {{modelPath}} = {{varDate}};
+}
+{%- endfor %}{{ formats ? ' else' : "if (false === #{varDate}})" }} {
     throw new \Exception('Invalid datetime string '.({{jsonPath}}).' matches none of the deserialization formats: '.{{formatsError}});
 }
-unset({{format}}, {{date}});
-
-EOT;
-
-    private const TMPL_ASSIGN_DATETIME_IMMUTABLE_TO_FIELD = <<<'EOT'
-{{modelPath}} = new \DateTimeImmutable({{jsonPath}});
-
-EOT;
-
-    private const TMPL_ASSIGN_DATETIME_IMMUTABLE_FROM_FORMAT = <<<'EOT'
-{{date}} = false;
-foreach([{{formats|join(', ')}}] as {{format}}) {
-    if (({{date}} = \DateTimeImmutable::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
-        {{modelPath}} = {{date}};
-        break;
-    }
-}
-
-if (false === {{date}}) {
-    throw new \Exception('Invalid datetime string '.({{jsonPath}}).' matches none of the deserialization formats: '.{{formatsError}});
-}
-unset({{format}}, {{date}});
+{% endif %}
 
 EOT;
 
@@ -159,19 +164,20 @@ unset({{variableNames|join(', ')}});
 EOT;
 
     private const TMPL_ASSIGN_BACKED_ENUM = <<<'EOT'
-{{modelPath}} = {{enumClass}}::from({{jsonPath}});
+{{modelPath}} = {% if nullCheck is not null -%}(null === {{jsonPath}}) ? null : {% endif %}{{enumClass}}::from({{jsonPath}});
 
 EOT;
 
     private const TMPL_ASSIGN_UNIT_ENUM = <<<'EOT'
-{{modelPath}} = (static function (string $n): {{enumClass}} {
-    foreach ({{enumClass}}::cases() as $case) {
-        if ($case->name === $n) {
-            return $case;
-        }
-    }
-    throw new \ValueError("'$n' is not a valid name for enum {{enumClass}}");
-})({{jsonPath}});
+{{modelPath}} = match({{jsonPath}}) {
+{% if nullCheck is not null -%}
+    null => null,
+{% endif %}
+{% for case,name in enumCases %}
+    {{name}} => {{enumClass}}::{{case}},
+{% endfor %}
+    default => throw new \ValueError("'{{'{' ~ jsonPath ~ '}'}}' is not a valid name for enum {{enumClass}}"),
+};
 
 EOT;
 
@@ -210,7 +216,7 @@ EOT;
         ]);
     }
 
-    public function renderArgument(string $variableName, string $default, string $code): string
+    public function renderArgument(string $variableName, string $default, ?string $code): string
     {
         return $this->render(self::TMPL_ARGUMENT, [
             'variableName' => $variableName,
@@ -262,6 +268,35 @@ EOT;
         ]);
     }
 
+    public function renderKeyExistsConditional(string $data, string $key, string $code, ?string $elseCode = null): string
+    {
+        return $this->render(self::TMPL_KEY_EXISTS_CONDITIONAL, [
+            'data' => $data,
+            'index' => var_export($key, true),
+            'code' => $code,
+            'elseCode' => $elseCode,
+        ]);
+    }
+
+    public function renderDynamicKeyExistsConditional(string $data, string $key, string $code, ?string $elseCode = null): string
+    {
+        return $this->render(self::TMPL_KEY_EXISTS_CONDITIONAL, [
+            'data' => $data,
+            'index' => $key,
+            'code' => $code,
+            'elseCode' => $elseCode,
+        ]);
+    }
+
+    public function renderIsNotNullConditional(string $jsonPath, string $code, ?string $elseCode): string
+    {
+        return $this->render(self::TMPL_IS_NULL_CONDITIONAL, [
+            'jsonPath' => $jsonPath,
+            'code' => $code,
+            'elseCode' => $elseCode,
+        ]);
+    }
+
     public function renderAssignJsonDataToField(string $modelPath, string $jsonPath): string
     {
         return $this->render(self::TMPL_ASSIGN_JSON_DATA_TO_FIELD, [
@@ -285,72 +320,83 @@ EOT;
         ]);
     }
 
-    public function renderAssignJsonDataToFieldWithCasting(string $modelPath, string $jsonPath, string $type): string
+    public function renderAssignJsonDataToFieldWithCasting(string $modelPath, string $jsonPath, string $type, bool $nullCheck = false): string
     {
         return $this->render(self::TMPL_ASSIGN_JSON_DATA_TO_FIELD_CASTING, [
             'modelPath' => $modelPath,
             'jsonPath' => $jsonPath,
             'type' => $type,
+            'nullCheck' => $nullCheck,
         ]);
     }
 
-    public function renderAssignDateTimeToField(bool $immutable, string $modelPath, string $jsonPath): string
+    public function renderAssignDateTimeToField(bool $immutable, string $modelPath, string $jsonPath, bool $nullCheck = false): string
     {
-        $template = $immutable ? self::TMPL_ASSIGN_DATETIME_IMMUTABLE_TO_FIELD : self::TMPL_ASSIGN_DATETIME_TO_FIELD;
+        $dateClass = $immutable ? \DateTimeImmutable::class : \DateTime::class;
 
-        return $this->render($template, [
+        return $this->render(self::TMPL_ASSIGN_DATETIME_TO_FIELD, [
             'modelPath' => $modelPath,
             'jsonPath' => $jsonPath,
+            'dateClass' => $dateClass,
+            'nullCheck' => $nullCheck,
         ]);
     }
 
     /**
      * @param list<string> $formats
      */
-    public function renderAssignDateTimeFromFormat(bool $immutable, string $modelPath, string $jsonPath, array $formats, ?string $timezone = null): string
+    public function renderAssignDateTimeFromFormat(bool $immutable, string $modelPath, string $jsonPath, array $formats, ?string $timezone = null, bool $nullCheck = false): string
     {
-        $template = $immutable ? self::TMPL_ASSIGN_DATETIME_IMMUTABLE_FROM_FORMAT : self::TMPL_ASSIGN_DATETIME_FROM_FORMAT;
+        $dateClass = $immutable ? \DateTimeImmutable::class : \DateTime::class;
         $formats = array_map(
             static fn (string $f): string => var_export($f, true),
             $formats
         );
         $formatsError = var_export(implode(',', $formats), true);
-        $dateVariable = preg_replace_callback(
-            '/([^a-zA-Z]+|\d+)([a-zA-Z])/',
-            static fn ($match): string => (ctype_digit($match[1]) ? $match[1] : null).mb_strtoupper($match[2]),
-            $modelPath
-        ).'Date';
+        $varDate = ModelPath::inventVariable("{$modelPath}Date", 'tempDt');
+        $varFormat = ModelPath::inventVariable("{$modelPath}Date", 'tempFormat');
 
-        return $this->render($template, [
+        return $this->render(self::TMPL_ASSIGN_DATETIME_FROM_FORMAT, [
             'modelPath' => $modelPath,
             'jsonPath' => $jsonPath,
             'formats' => $formats,
             'formatsError' => $formatsError,
-            'format' => '$'.lcfirst($dateVariable).'Format',
-            'date' => '$'.lcfirst($dateVariable),
+            'dateClass' => $dateClass,
+            'varFormat' => (string) $varFormat,
+            'varDate' => (string) $varDate,
             'timezone' => $timezone ? 'new \DateTimeZone('.var_export($timezone, true).')' : 'null',
+            'nullCheck' => $nullCheck,
         ]);
     }
 
-    public function renderAssignBackedEnum(string $enumClass, string $modelPath, string $jsonPath): string
+    public function renderAssignBackedEnum(string $enumClass, string $modelPath, string $jsonPath, bool $nullCheck): string
     {
         return $this->render(self::TMPL_ASSIGN_BACKED_ENUM, [
             'enumClass' => $enumClass,
             'modelPath' => $modelPath,
             'jsonPath' => $jsonPath,
+            'nullCheck' => $nullCheck,
         ]);
     }
 
-    public function renderAssignUnitEnum(string $enumClass, string $modelPath, string $jsonPath): string
+    /**
+     * @param class-string<\BackedEnum> $enumClass
+     */
+    public function renderAssignUnitEnum(string $enumClass, string $modelPath, string $jsonPath, bool $nullCheck): string
     {
+        $cases = array_column($enumClass::cases(), 'name', 'name');
+        $cases = array_map(static fn (string $f): string => var_export($f, true), $cases);
+
         return $this->render(self::TMPL_ASSIGN_UNIT_ENUM, [
             'enumClass' => $enumClass,
+            'enumCases' => $cases,
             'modelPath' => $modelPath,
             'jsonPath' => $jsonPath,
+            'nullCheck' => $nullCheck,
         ]);
     }
 
-    public function renderExtract(string $jsonPath, string $default = 'null'): string
+    public function renderExtract(?string $jsonPath, string $default = 'null'): string
     {
         return $this->render(self::TMPL_EXTRACT, [
             'jsonPath' => $jsonPath,

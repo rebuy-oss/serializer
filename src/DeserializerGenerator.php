@@ -18,6 +18,7 @@ use Liip\MetadataParser\Metadata\PropertyTypeUnknown;
 use Liip\MetadataParser\Reducer\TakeBestReducer;
 use Liip\Serializer\Configuration\ClassToGenerate;
 use Liip\Serializer\Configuration\GeneratorConfiguration;
+use Liip\Serializer\Path\ArrayEntry;
 use Liip\Serializer\Path\ArrayPath;
 use Liip\Serializer\Path\ModelPath;
 use Liip\Serializer\Template\Deserialization;
@@ -110,6 +111,7 @@ final class DeserializerGenerator
         $initCode = '';
         $code = '';
         foreach ($classMetadata->getProperties() as $propertyMetadata) {
+            $propertyType = $propertyMetadata->getType();
             $propertyArrayPath = $arrayPath->withFieldName($propertyMetadata->getSerializedName());
 
             if ($classMetadata->hasConstructorParameter($propertyMetadata->getName())) {
@@ -120,12 +122,22 @@ final class DeserializerGenerator
                     $overwrittenNames[$propertyMetadata->getName()] = true;
                 }
                 $constructorArgumentNames[$propertyMetadata->getName()] = (string) $tempVariable;
+                $getValue = $this->generateInnerCodeForFieldType($propertyType, $propertyArrayPath, $tempVariable, $stack);
 
-                $initCode .= $this->templating->renderArgument(
-                    (string) $tempVariable,
-                    $default,
-                    $this->generateCodeForField($propertyMetadata, $propertyArrayPath, $tempVariable, $stack)
-                );
+                if ($this->configuration->shouldTreatNullAsDefault()) {
+                    $initCode .= $this->templating->renderArgument(
+                        (string) $tempVariable,
+                        $default,
+                        $this->templating->renderConditional((string) $propertyArrayPath, $getValue)
+                    );
+                } else {
+                    $initCode .= $this->templating->renderDynamicKeyExistsConditional(
+                        (string) $arrayPath,
+                        var_export($propertyMetadata->getSerializedName(), true),
+                        $getValue,
+                        $this->templating->renderArgument((string) $tempVariable, $default, null),
+                    );
+                }
             } else {
                 $code .= $this->generateCodeForProperty($propertyMetadata, $propertyArrayPath, $modelPath, $stack);
             }
@@ -197,53 +209,105 @@ final class DeserializerGenerator
             return '';
         }
 
+        /** @var non-empty-list<ArrayEntry> $arrayPathLastKey */
+        [$arrayPathBase, $arrayPathLastKey] = $arrayPath->splitBack();
+        $arrayPathLastKey = array_pop($arrayPathLastKey)->getPath();
+        $propertyType = $propertyMetadata->getType();
+
         if ($propertyMetadata->getAccessor()->hasSetterMethod()) {
             $tempVariable = ModelPath::tempVariable([(string) $modelPath, $propertyMetadata->getName()]);
-            $code = $this->generateCodeForField($propertyMetadata, $arrayPath, $tempVariable, $stack);
-            $code .= $this->templating->renderConditional(
-                (string) $tempVariable,
-                $this->templating->renderSetter((string) $modelPath, $propertyMetadata->getAccessor()->getSetterMethod(), (string) $tempVariable)
-            );
-            $code .= $this->templating->renderUnset([(string) $tempVariable]);
+            $getValue = $this->generateInnerCodeForFieldType($propertyType, $arrayPath, $tempVariable, $stack);
+            $setIntoModel = $this->templating->renderSetter((string) $modelPath, $propertyMetadata->getAccessor()->getSetterMethod(), (string) $tempVariable);
+
+            if ($this->configuration->shouldTreatNullAsDefault()) {
+                $code = $this->templating->renderConditional((string) $arrayPath, $getValue);
+                $code .= $this->templating->renderConditional((string) $tempVariable, $setIntoModel);
+            } else {
+                $code = $this->templating->renderDynamicKeyExistsConditional((string) $arrayPathBase, (string) $arrayPathLastKey, "{$getValue}    {$setIntoModel}");
+            }
 
             return $code;
         }
 
         $modelPropertyPath = $modelPath->withPath($propertyMetadata->getName());
+        $getValue = $this->generateInnerCodeForFieldType($propertyType, $arrayPath, $modelPropertyPath, $stack);
 
-        return $this->generateCodeForField($propertyMetadata, $arrayPath, $modelPropertyPath, $stack);
+        if ($this->configuration->shouldTreatNullAsDefault()) {
+            return $this->templating->renderConditional((string) $arrayPath, $getValue);
+        }
+
+        if (!$propertyType->isNullable() || $this->typeDeserializesAsExpression($propertyType)) {
+            // No need to check for null values if not-nullable or the null-check is handled within a conversion expression
+            return $this->templating->renderDynamicKeyExistsConditional((string) $arrayPathBase, (string) $arrayPathLastKey, $getValue);
+        }
+
+        $dataVar = $arrayPath;
+        $makeIntermediate = '';
+
+        if ($propertyType instanceof PropertyTypeClass) {
+            $dataVar = ArrayPath::inventVariable((string) $arrayPath, 'class');
+            $makeIntermediate .= $this->templating->renderAssignJsonDataToField((string) $dataVar, (string) $arrayPath)."\n";
+        }
+
+        $deserializeValue = $makeIntermediate.$this->generateInnerCodeForFieldType($propertyType->asNullable(false), $dataVar, $modelPropertyPath, $stack);
+        $setNull = $this->templating->renderArgument((string) $modelPropertyPath, 'null', null);
+
+        return $this->templating->renderDynamicKeyExistsConditional(
+            (string) $arrayPathBase,
+            (string) $arrayPathLastKey,
+            $this->templating->renderIsNotNullConditional((string) $arrayPath, $deserializeValue, $setNull)
+        );
     }
 
     /**
-     * @param array<string, positive-int> $stack
+     * Whether a PropertyType requires the target to be set to null in a separate statement (returns true), or its expression already allows the null case (returns false)
+     *
+     * @return bool True if the type needs a separate statement for the null case
      */
-    private function generateCodeForField(
-        PropertyMetadata $propertyMetadata,
-        ArrayPath $arrayPath,
-        ModelPath $modelPath,
-        array $stack,
-    ): string {
-        return $this->templating->renderConditional(
-            (string) $arrayPath,
-            $this->generateInnerCodeForFieldType($propertyMetadata, $arrayPath, $modelPath, $stack)
-        );
+    private function typeDeserializesAsExpression(PropertyType $type): bool
+    {
+        switch ($type) {
+            case $type instanceof PropertyTypePrimitive:
+            case $type instanceof PropertyTypeUnknown:
+            case $type instanceof PropertyTypeEnum:
+                return true;
+            case $type instanceof PropertyTypeDateTime:
+                $formats = $type->getDeserializeFormats() ?: $type->getFormat();
+                if (!$formats) {
+                    return true;
+                }
+                if ((\is_string($formats) || (1 === \count($formats))) && !$type->isNullable()) {
+                    return true;
+                }
+
+                return false;
+
+            case $type instanceof PropertyTypeIterable:
+                $subType = $type->getLeafType();
+
+                return !$type->isTraversable() && ($subType instanceof PropertyTypePrimitive || $subType instanceof PropertyTypeUnknown);
+
+            case $type instanceof PropertyTypeClass:
+            case $type instanceof PropertyTypeUnion:
+                return false;
+        }
+
+        return false;
     }
 
     /**
      * @param array<string, positive-int> $stack
      */
     private function generateInnerCodeForFieldType(
-        PropertyMetadata $propertyMetadata,
+        PropertyType $type,
         ArrayPath $arrayPath,
         ModelPath $modelPropertyPath,
         array $stack,
     ): string {
-        $type = $propertyMetadata->getType();
-
         switch ($type) {
             case $type instanceof PropertyTypeIterable:
                 if ($type->isTraversable()) {
-                    return $this->generateCodeForArrayCollection($propertyMetadata, $type, $arrayPath, $modelPropertyPath, $stack);
+                    return $this->generateCodeForArrayCollection($type, $arrayPath, $modelPropertyPath, $stack);
                 }
 
                 return $this->generateCodeForArray($type, $arrayPath, $modelPropertyPath, $stack);
@@ -251,19 +315,20 @@ final class DeserializerGenerator
             case $type instanceof PropertyTypeDateTime:
                 $formats = $type->getDeserializeFormats() ?: (null !== $type->getFormat() ? [$type->getFormat()] : null);
                 if (null !== $formats) {
-                    return $this->templating->renderAssignDateTimeFromFormat($type->isImmutable(), (string) $modelPropertyPath, (string) $arrayPath, $formats, $type->getZone());
+                    return $this->templating->renderAssignDateTimeFromFormat($type->isImmutable(), (string) $modelPropertyPath, (string) $arrayPath, $formats, $type->getZone(), nullCheck: $type->isNullable());
                 }
 
-                return $this->templating->renderAssignDateTimeToField($type->isImmutable(), (string) $modelPropertyPath, (string) $arrayPath);
+                return $this->templating->renderAssignDateTimeToField($type->isImmutable(), (string) $modelPropertyPath, (string) $arrayPath, nullCheck: $type->isNullable());
 
             case $type instanceof PropertyTypePrimitive && 'float' === $type->getTypeName():
-                return $this->templating->renderAssignJsonDataToFieldWithCasting((string) $modelPropertyPath, (string) $arrayPath, 'float');
+                return $this->templating->renderAssignJsonDataToFieldWithCasting((string) $modelPropertyPath, (string) $arrayPath, 'float', $type->isNullable());
 
             case $type instanceof PropertyTypePrimitive:
             case $type instanceof PropertyTypeUnknown:
                 return $this->templating->renderAssignJsonDataToField((string) $modelPropertyPath, (string) $arrayPath);
 
             case $type instanceof PropertyTypeEnum:
+                // It handles null checks itself
                 return $this->generateCodeForEnumField($type, $modelPropertyPath, $arrayPath);
 
             case $type instanceof PropertyTypeClass:
@@ -346,23 +411,22 @@ final class DeserializerGenerator
             return $this->templating->renderAssignJsonDataToField((string) $modelPath, (string) $arrayPath);
         }
 
-        $index = ModelPath::indexVariable((string) $arrayPath);
-        $valuePath = new ArrayPath('value'.mb_strlen((string) $arrayPath));
-
+        $index = ArrayPath::indexVariable((string) $arrayPath);
+        $value = ArrayPath::inventVariable((string) $arrayPath, 'value');
         $modelPropertyPath = $modelPath->withArray((string) $index);
         $subType = $type->getSubType();
 
         switch ($subType) {
             case $subType instanceof PropertyTypeIterable:
-                $innerCode = $this->generateCodeForArray($subType, $valuePath, $modelPropertyPath, $stack);
+                $innerCode = $this->generateCodeForArray($subType, $value, $modelPropertyPath, $stack);
                 break;
 
             case $subType instanceof PropertyTypeEnum:
-                $innerCode = $this->generateCodeForEnumField($subType, $modelPropertyPath, $valuePath);
+                $innerCode = $this->generateCodeForEnumField($subType, $modelPropertyPath, $value);
                 break;
 
             case $subType instanceof PropertyTypeClass:
-                $innerCode = $this->generateCodeForClass($subType->getClassMetadata(), $valuePath, $modelPropertyPath, $stack);
+                $innerCode = $this->generateCodeForClass($subType->getClassMetadata(), $value, $modelPropertyPath, $stack);
                 break;
 
             case $subType instanceof PropertyTypeUnknown && $this->configuration->shouldAllowGenericArrays():
@@ -377,7 +441,7 @@ final class DeserializerGenerator
         }
 
         $code = $this->templating->renderInitArray((string) $modelPath);
-        $code .= $this->templating->renderLoop((string) $arrayPath, (string) $index, (string) $valuePath, $innerCode);
+        $code .= $this->templating->renderLoop((string) $arrayPath, (string) $index, (string) $value, $innerCode);
 
         return $code;
     }
@@ -386,13 +450,12 @@ final class DeserializerGenerator
      * @param array<string, positive-int> $stack
      */
     private function generateCodeForArrayCollection(
-        PropertyMetadata $propertyMetadata,
         PropertyTypeIterable $type,
         ArrayPath $arrayPath,
         ModelPath $modelPath,
         array $stack,
     ): string {
-        $tmpVariable = ModelPath::tempVariable([(string) $modelPath, $propertyMetadata->getName()]);
+        $tmpVariable = ModelPath::tempVariable([(string) $modelPath]);
         $innerCode = $this->generateCodeForArray($type, $arrayPath, $tmpVariable, $stack);
 
         if ('' === $innerCode) {
@@ -407,11 +470,14 @@ final class DeserializerGenerator
         ModelPath $modelPath,
         ArrayPath $arrayPath,
     ): string {
+        /** @var class-string<\BackedEnum> $enumClass */
+        $enumClass = $type->getClassName();
+
         if ($type->shouldSerializeAsValue()) {
-            return $this->templating->renderAssignBackedEnum($type->getClassName(), (string) $modelPath, (string) $arrayPath);
+            return $this->templating->renderAssignBackedEnum($enumClass, (string) $modelPath, (string) $arrayPath, $type->isNullable());
         }
 
-        return $this->templating->renderAssignUnitEnum($type->getClassName(), (string) $modelPath, (string) $arrayPath);
+        return $this->templating->renderAssignUnitEnum($enumClass, (string) $modelPath, (string) $arrayPath, $type->isNullable());
     }
 
     /**

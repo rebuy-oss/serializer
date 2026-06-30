@@ -2,6 +2,34 @@
 
 # 3.x
 
+# 3.7.0
+
+* New deserialization option `generation.deserialization.null_as_default` (default `true`, set via
+  `options['generation']['deserialization']`). When `false`, an incoming `null` is treated as a real value
+  and assigned to the property instead of being skipped: the generated code guards fields with
+  `array_key_exists()` rather than `isset()`, so a field that is present-but-null is no longer silently
+  left at its default. Default `true` preserves the previous behaviour.
+* Deserialization fixes:
+  * Nullable properties are now handled more correctly: assigned as an expression where possible, otherwise
+    through an explicit `if (null !== ...) ... else ...` so an explicit `null` is no longer lost.
+  * DateTime deserialization null-handling fixes: single-format dates are emitted as an expression, and
+    multi-format dates correctly handle a `null` value instead of passing `null` into `createFromFormat()`.
+* Many deserialization code optimizations:
+  * Nested objects are deserialized through intermediate variables instead of repeatedly indexing into the
+    source array, removing redundant lookups for each nested field.
+  * Arrays are deserialized with a direct `foreach ($array as $key => $value)` instead of iterating
+    `array_keys()` and re-indexing on every element - fewer array lookups for large collections.
+  * Enum deserialization now selects the case with a `match() {}` expression instead of a closure-over-`foreach`.
+  * Removed unnecessary `unset()` calls from generated code; temporary variables are now uniquely named so
+    clearing them is no longer required.
+* Many serialization code optimizations:
+  * Generated serialization code is simplified and now uses intermediate variables.
+  * With `serialize_null` enabled, a class's simple (non-conditional) fields can be serialized in a single
+    statement.
+  * Generic arrays no longer trigger `instanceof` collection checks during serialization.
+    `serializerGroups` parameters. If you call generated serialize functions directly, update the call sites.
+  See [rebuy-oss/serializer#15](https://github.com/rebuy-oss/serializer/pull/15)
+
 # 3.6.0
 
 * Add `phpbench/phpbench` and some benchmarks

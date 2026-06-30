@@ -128,7 +128,7 @@ final class SerializerGenerator
         }
 
         $discriminatorMetadata = $classMetadata->getDiscriminatorMetadata();
-        if (null !== $discriminatorMetadata && $discriminatorMetadata->baseClass == $className) {
+        if ($discriminatorMetadata && $discriminatorMetadata->baseClass == $className) {
             return $this->generateCodeForDiscriminatorClass($classMetadata, $target, $modelPath, $stack, $depth);
         }
 
@@ -138,9 +138,17 @@ final class SerializerGenerator
         $nestedTarget = $isRootLevel ? $target : ModelPath::inventVariable("{$target}", 'object');
 
         $code = '';
-        if ($this->configuration->shouldSerializeNull() && !$discriminatorMetadata) {
+        if ($this->configuration->shouldSerializeNull()) {
             $initialValues = [];
             $remainingProperties = $classMetadata->getProperties();
+
+            if ($discriminatorMetadata) {
+                $initialValues[$discriminatorMetadata->propertyName] = [
+                    'key' => var_export($discriminatorMetadata->propertyName, true),
+                    'value' => var_export($discriminatorMetadata->value, true),
+                ];
+            }
+
             foreach ($remainingProperties as $key => $property) {
                 $type = $property->getType();
                 $modelPropertyPath = $property->getAccessor()->hasGetterMethod()
@@ -155,7 +163,6 @@ final class SerializerGenerator
                 $initialValues[$serializedName] = [
                     'key' => var_export($serializedName, true),
                     'value' => $expression,
-                    'property' => $property,
                 ];
                 unset($remainingProperties[$key]);
             }

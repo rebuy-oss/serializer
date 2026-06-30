@@ -241,7 +241,15 @@ final class DeserializerGenerator
             return $this->templating->renderDynamicKeyExistsConditional((string) $arrayPathBase, (string) $arrayPathLastKey, $getValue);
         }
 
-        $deserializeValue = $this->generateInnerCodeForFieldType($propertyType->asNullable(false), $arrayPath, $modelPropertyPath, $stack);
+        $dataVar = $arrayPath;
+        $makeIntermediate = '';
+
+        if ($propertyType instanceof PropertyTypeClass) {
+            $dataVar = ArrayPath::inventVariable((string) $arrayPath, 'class');
+            $makeIntermediate .= $this->templating->renderAssignJsonDataToField((string) $dataVar, (string) $arrayPath)."\n";
+        }
+
+        $deserializeValue = $makeIntermediate.$this->generateInnerCodeForFieldType($propertyType->asNullable(false), $dataVar, $modelPropertyPath, $stack);
         $setNull = $this->templating->renderArgument((string) $modelPropertyPath, 'null', null);
 
         return $this->templating->renderDynamicKeyExistsConditional(

@@ -2,6 +2,10 @@
 
 # 3.x
 
+# 3.7.0
+
+* Support serialization for class union types like (e.g.) `public Foo|Bar $property`.
+
 # 3.6.0
 
 * Add `phpbench/phpbench` and some benchmarks

@@ -310,7 +310,10 @@ final class DeserializerGenerator
         }
 
         if (0 !== \count($typesWithoutPrimitives)) {
-            throw new \Exception('Found union type that contains primitives and non primitives, which is currently not supported.');
+            $currentClass = array_key_last($stack);
+            $currentProperty = $modelPath->getLastEntry();
+
+            throw new \Exception(\sprintf('Non primitive union types without a UnionDiscriminator for the %s::%s property are not supported for de-serialization.', $currentClass, $currentProperty->getPath()));
         }
 
         $amountOfTypes = \count($types);

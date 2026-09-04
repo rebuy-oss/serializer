@@ -2,6 +2,10 @@
 
 # 3.x
 
+# 3.6.1
+
+* Fix nested array looping
+
 # 3.6.0
 
 * Add `phpbench/phpbench` and some benchmarks

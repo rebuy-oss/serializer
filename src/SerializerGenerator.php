@@ -229,7 +229,7 @@ final class SerializerGenerator
             throw new \Exception(\sprintf('Property %s is not public and no getter has been defined. Stack %s', $modelPropertyPath, var_export($stack, true)));
         }
 
-        $serializeField = $this->generateCodeForFieldType($type, $apiVersion, $serializerGroups, $fieldTarget, $modelPropertyPath, $stack);
+        $serializeField = $this->generateCodeForFieldType($type, $apiVersion, $serializerGroups, $fieldTarget, $modelPropertyPath, $stack, $depth + 1);
 
         if (!$shouldSerializeNull) {
             return $this->templating->renderConditional($modelPropertyPath, $serializeField);

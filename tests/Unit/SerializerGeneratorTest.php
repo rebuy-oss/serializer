@@ -27,6 +27,8 @@ use Tests\Liip\Serializer\Fixtures\EnumModel;
 use Tests\Liip\Serializer\Fixtures\InaccessiblePrivateProperty;
 use Tests\Liip\Serializer\Fixtures\Inheritance;
 use Tests\Liip\Serializer\Fixtures\ListModel;
+use Tests\Liip\Serializer\Fixtures\ListOfListModel;
+use Tests\Liip\Serializer\Fixtures\ListOfModel;
 use Tests\Liip\Serializer\Fixtures\Model;
 use Tests\Liip\Serializer\Fixtures\ModelWithCustomType;
 use Tests\Liip\Serializer\Fixtures\MultidimensionalArrayForPrimitive;
@@ -138,6 +140,60 @@ class SerializerGeneratorTest extends SerializerTestCase
         ];
 
         $data = $functionName($list);
+        self::assertSame($expected, $data);
+    }
+
+    public function testNestedListsInsideList(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ListOfListModel';
+        self::generateSerializers(self::$metadataBuilder, ListOfListModel::class, [$functionName], ['']);
+
+        $item1 = new ListModel();
+        $item1->listNested = [new Nested('a'), new Nested('b')];
+
+        $item2 = new ListModel();
+        $item2->listNested = [new Nested('c'), new Nested('d')];
+
+        $list = new ListOfListModel();
+        $list->items = [$item1, $item2];
+
+        $expected = [
+            'items' => [
+                ['list_nested' => [['nested_string' => 'a'], ['nested_string' => 'b']]],
+                ['list_nested' => [['nested_string' => 'c'], ['nested_string' => 'd']]],
+            ],
+        ];
+
+        $data = $functionName($list);
+
+        self::assertSame($expected, $data);
+    }
+
+    public function testNestedObjectFieldInsideList(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ListOfModel';
+        self::generateSerializers(self::$metadataBuilder, ListOfModel::class, [$functionName], ['']);
+
+        $item1 = new Model();
+        $item1->apiString = 'api1';
+        $item1->nestedField = new Nested('nested1');
+
+        $item2 = new Model();
+        $item2->apiString = 'api2';
+        $item2->nestedField = new Nested('nested2');
+
+        $list = new ListOfModel();
+        $list->items = [$item1, $item2];
+
+        $expected = [
+            'items' => [
+                ['api_string' => 'api1', 'nested_field' => ['nested_string' => 'nested1']],
+                ['api_string' => 'api2', 'nested_field' => ['nested_string' => 'nested2']],
+            ],
+        ];
+
+        $data = $functionName($list);
+
         self::assertSame($expected, $data);
     }
 

@@ -2,15 +2,12 @@
 
 # 3.x
 
-# 3.7.0
-
-* Support serialization for class union types like (e.g.) `public Foo|Bar $property`.
-
 # 3.6.0
 
 * Add `phpbench/phpbench` and some benchmarks
 * Improve performance of (de)serialization by adjusting the generated code a bit
 * Fix wrong serialization for hashmaps
+* Support serialization for class union types like (e.g.) `public Foo|Bar $property`.
 
 # 3.5.0
 

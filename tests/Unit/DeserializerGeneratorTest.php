@@ -33,6 +33,7 @@ use Tests\Liip\Serializer\Fixtures\ModelWithCustomType;
 use Tests\Liip\Serializer\Fixtures\Nested;
 use Tests\Liip\Serializer\Fixtures\NonEmptyConstructor;
 use Tests\Liip\Serializer\Fixtures\PostDeserialize;
+use Tests\Liip\Serializer\Fixtures\PrimitiveClassUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrimitiveUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrivateProperty;
 use Tests\Liip\Serializer\Fixtures\RecursionModel;
@@ -372,6 +373,14 @@ class DeserializerGeneratorTest extends SerializerTestCase
             [0.5],
             [['key' => 'value', 'another_key' => 'another_value']],
         ];
+    }
+
+    public function testPrimitiveClassUnion(): void
+    {
+        $this->expectExceptionMessage('Non primitive union types without a UnionDiscriminator for the Tests\Liip\Serializer\Fixtures\PrimitiveClassUnionTyping::classUnion property are not supported for de-serialization.');
+
+        $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_PrimitiveUnionTyping';
+        self::generateDeserializer(self::$metadataBuilder, PrimitiveClassUnionTyping::class, $functionName, ['allow_generic_arrays' => true]);
     }
 
     public function testPostDeserialize(): void

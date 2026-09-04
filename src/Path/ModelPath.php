@@ -57,4 +57,9 @@ final class ModelPath implements \Stringable
 
         return $clone;
     }
+
+    public function getLastEntry(): AbstractEntry
+    {
+        return array_last($this->path);
+    }
 }

@@ -32,6 +32,7 @@ use Tests\Liip\Serializer\Fixtures\ModelWithCustomType;
 use Tests\Liip\Serializer\Fixtures\MultidimensionalArrayForPrimitive;
 use Tests\Liip\Serializer\Fixtures\Nested;
 use Tests\Liip\Serializer\Fixtures\PostDeserialize;
+use Tests\Liip\Serializer\Fixtures\PrimitiveClassUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrimitiveUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrivateProperty;
 use Tests\Liip\Serializer\Fixtures\RecursionModel;
@@ -487,6 +488,35 @@ class SerializerGeneratorTest extends SerializerTestCase
             [0.5],
             [['key' => 'value', 'another_key' => 'another_value']],
         ];
+    }
+
+    public function testPrimitiveClassUnion(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_PrimitiveClassUnionTyping';
+        self::generateSerializers(self::$metadataBuilder, PrimitiveClassUnionTyping::class, [$functionName], [''], [], ['allow_generic_arrays' => true]);
+
+        $model = new PrimitiveClassUnionTyping();
+        $model->classUnion = new VirtualProperties();
+        $model->classUnion->apiString = 'testString';
+
+        $expected = [
+            'class_union' => ['api_string' => 'testString', 'api_string_virtual' => 'testString_virtual'],
+        ];
+        $data = $functionName($model);
+
+        self::assertSame($expected, $data);
+
+        $model = new PrimitiveClassUnionTyping();
+        $model->classUnion = new Model();
+        $model->classUnion->apiString = 'modelApiString';
+        $model->classUnion->detailString = 'modelDetailString';
+
+        $expected = [
+            'class_union' => ['api_string' => 'modelApiString', 'detail_string' => 'modelDetailString'],
+        ];
+        $data = $functionName($model);
+
+        self::assertSame($expected, $data);
     }
 
     /**

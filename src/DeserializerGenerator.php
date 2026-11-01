@@ -313,15 +313,18 @@ final class DeserializerGenerator
                 return $this->generateCodeForArray($type, $arrayPath, $modelPropertyPath, $stack);
 
             case $type instanceof PropertyTypeDateTime:
+                $nullCheck = !$this->configuration->shouldTreatNullAsDefault() && $type->isNullable();
                 $formats = $type->getDeserializeFormats() ?: (null !== $type->getFormat() ? [$type->getFormat()] : null);
                 if (null !== $formats) {
-                    return $this->templating->renderAssignDateTimeFromFormat($type->isImmutable(), (string) $modelPropertyPath, (string) $arrayPath, $formats, $type->getZone(), nullCheck: $type->isNullable());
+                    return $this->templating->renderAssignDateTimeFromFormat($type->isImmutable(), (string) $modelPropertyPath, (string) $arrayPath, $formats, $type->getZone(), nullCheck: $nullCheck);
                 }
 
-                return $this->templating->renderAssignDateTimeToField($type->isImmutable(), (string) $modelPropertyPath, (string) $arrayPath, nullCheck: $type->isNullable());
+                return $this->templating->renderAssignDateTimeToField($type->isImmutable(), (string) $modelPropertyPath, (string) $arrayPath, nullCheck: $nullCheck);
 
             case $type instanceof PropertyTypePrimitive && 'float' === $type->getTypeName():
-                return $this->templating->renderAssignJsonDataToFieldWithCasting((string) $modelPropertyPath, (string) $arrayPath, 'float', $type->isNullable());
+                $nullCheck = !$this->configuration->shouldTreatNullAsDefault() && $type->isNullable();
+
+                return $this->templating->renderAssignJsonDataToFieldWithCasting((string) $modelPropertyPath, (string) $arrayPath, 'float', $nullCheck);
 
             case $type instanceof PropertyTypePrimitive:
             case $type instanceof PropertyTypeUnknown:
@@ -476,11 +479,12 @@ final class DeserializerGenerator
         /** @var class-string<\BackedEnum> $enumClass */
         $enumClass = $type->getClassName();
 
+        $nullCheck = !$this->configuration->shouldTreatNullAsDefault() && $type->isNullable();
         if ($type->shouldSerializeAsValue()) {
-            return $this->templating->renderAssignBackedEnum($enumClass, (string) $modelPath, (string) $arrayPath, $type->isNullable());
+            return $this->templating->renderAssignBackedEnum($enumClass, (string) $modelPath, (string) $arrayPath, $nullCheck);
         }
 
-        return $this->templating->renderAssignUnitEnum($enumClass, (string) $modelPath, (string) $arrayPath, $type->isNullable());
+        return $this->templating->renderAssignUnitEnum($enumClass, (string) $modelPath, (string) $arrayPath, $nullCheck);
     }
 
     /**

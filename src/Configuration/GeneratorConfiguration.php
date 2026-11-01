@@ -187,7 +187,7 @@ class GeneratorConfiguration implements \IteratorAggregate
     }
 
     /**
-     * If this is false, do not add wrap conditionals around assigning fields whose value is null
+     * If this is false, do not wrap conditionals around assigning fields whose value is null
      */
     public function shouldSerializeNull(): bool
     {
@@ -195,7 +195,7 @@ class GeneratorConfiguration implements \IteratorAggregate
     }
 
     /**
-     * If this is false, do not add wrap conditionals around assigning fields whose value is null
+     * If this is false, do not wrap conditionals around assigning fields whose value is null
      */
     public function shouldTreatNullAsDefault(): bool
     {

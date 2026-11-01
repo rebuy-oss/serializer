@@ -31,7 +31,7 @@ class DefaultValues
     public $plannedFor;
 
     /**
-     * @Serializer\Type("Tests\Liip\Serializer\Fixtures\BackedStringEnum")
+     * @Serializer\Type("enum<'Tests\Liip\Serializer\Fixtures\BackedStringEnum'>")
      */
     public $stringEnum;
 }

@@ -15,7 +15,7 @@ final class Deserialization
         'array' => '\is_array({{value}})',
         'int' => '(string) (int) {{value}} === (string) {{value}}',
         'float' => '(string) (float) {{value}} === (string) {{value}}',
-        'bool' => '!is_array({{value}}) && (string) (bool) {{value}} === (string) {{value}}',
+        'bool' => '!\is_array({{value}}) && (string) (bool) {{value}} === (string) {{value}}',
         'true' => 'true === {{value}}',
         'false' => 'false === {{value}}',
         'string' => '!\is_array({{value}}) && !\is_object({{value}})',
@@ -106,17 +106,17 @@ EOT;
 EOT;
 
     private const TMPL_ASSIGN_JSON_DATA_TO_FIELD_CASTING = <<<'EOT'
-{{modelPath}} = {% if nullCheck ?? false -%}(null === {{jsonPath}}) ? null : {% endif %}({{type}}) {{jsonPath}};
+{{modelPath}} = {% if nullCheck -%}(null === {{jsonPath}}) ? null : {% endif %}({{type}}) {{jsonPath}};
 
 EOT;
 
     private const TMPL_ASSIGN_DATETIME_TO_FIELD = <<<'EOT'
-{{modelPath}} = {% if nullCheck ?? false -%}(null === {{jsonPath}}) ? null : {% endif %}new {{dateClass}}({{jsonPath}});
+{{modelPath}} = {% if nullCheck -%}(null === {{jsonPath}}) ? null : {% endif %}new {{dateClass}}({{jsonPath}});
 
 EOT;
 
     private const TMPL_ASSIGN_DATETIME_FROM_FORMAT = <<<'EOT'
-{% if (1 === (formats|length)) and not nullCheck ?? false %}
+{% if (1 === (formats|length)) and not nullCheck %}
     {{modelPath}} = {{dateClass}}::createFromFormat({{formats|first}}, {{jsonPath}}, {{timezone}}) ?: throw new \Exception('Invalid datetime string '.({{jsonPath}}).' matches none of the deserialization formats: '.{{formatsError}});
 {% else %}
 {% if not formats %}{{varDate}} = false;{% endif ~%}
@@ -129,7 +129,7 @@ if (null === {{jsonPath}}) {
 {{ (loop.first or nullCheck) ? '' : ' else '-}} if (({{varDate}} = {{dateClass}}::createFromFormat({{format}}, {{jsonPath}}, {{timezone}}))) {
     {{modelPath}} = {{varDate}};
 }
-{%- endfor %}{{ formats ? ' else' : "if (false === #{varDate}})" }} {
+{%- endfor %}{{ formats ? ' else' : "if (false === #{varDate})" }} {
     throw new \Exception('Invalid datetime string '.({{jsonPath}}).' matches none of the deserialization formats: '.{{formatsError}});
 }
 {% endif %}
@@ -164,13 +164,13 @@ unset({{variableNames|join(', ')}});
 EOT;
 
     private const TMPL_ASSIGN_BACKED_ENUM = <<<'EOT'
-{{modelPath}} = {% if nullCheck is not null -%}(null === {{jsonPath}}) ? null : {% endif %}{{enumClass}}::from({{jsonPath}});
+{{modelPath}} = {% if nullCheck -%}(null === {{jsonPath}}) ? null : {% endif %}{{enumClass}}::from({{jsonPath}});
 
 EOT;
 
     private const TMPL_ASSIGN_UNIT_ENUM = <<<'EOT'
 {{modelPath}} = match({{jsonPath}}) {
-{% if nullCheck is not null -%}
+{% if nullCheck -%}
     null => null,
 {% endif %}
 {% for case,name in enumCases %}
@@ -268,16 +268,6 @@ EOT;
         ]);
     }
 
-    public function renderKeyExistsConditional(string $data, string $key, string $code, ?string $elseCode = null): string
-    {
-        return $this->render(self::TMPL_KEY_EXISTS_CONDITIONAL, [
-            'data' => $data,
-            'index' => var_export($key, true),
-            'code' => $code,
-            'elseCode' => $elseCode,
-        ]);
-    }
-
     public function renderDynamicKeyExistsConditional(string $data, string $key, string $code, ?string $elseCode = null): string
     {
         return $this->render(self::TMPL_KEY_EXISTS_CONDITIONAL, [
@@ -354,7 +344,6 @@ EOT;
         );
         $formatsError = var_export(implode(',', $formats), true);
         $varDate = ModelPath::inventVariable("{$modelPath}Date", 'tempDt');
-        $varFormat = ModelPath::inventVariable("{$modelPath}Date", 'tempFormat');
 
         return $this->render(self::TMPL_ASSIGN_DATETIME_FROM_FORMAT, [
             'modelPath' => $modelPath,
@@ -362,7 +351,6 @@ EOT;
             'formats' => $formats,
             'formatsError' => $formatsError,
             'dateClass' => $dateClass,
-            'varFormat' => (string) $varFormat,
             'varDate' => (string) $varDate,
             'timezone' => $timezone ? 'new \DateTimeZone('.var_export($timezone, true).')' : 'null',
             'nullCheck' => $nullCheck,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Liip\Serializer;
 
+use Liip\MetadataParser\Metadata\ClassDiscriminatorMetadata;
 use Liip\MetadataParser\Builder;
 use Liip\MetadataParser\Metadata\AbstractPropertyType;
 use Liip\MetadataParser\Metadata\ClassMetadata;
@@ -129,14 +130,14 @@ final class SerializerGenerator
 
         $discriminatorMetadata = $classMetadata->getDiscriminatorMetadata();
         $properties = $classMetadata->getProperties();
-        if ($discriminatorMetadata && $discriminatorMetadata->baseClass == $className) {
+        if ($discriminatorMetadata instanceof ClassDiscriminatorMetadata && $discriminatorMetadata->baseClass == $className) {
             return $this->generateCodeForDiscriminatorClass($classMetadata, $target, $modelPath, $stack, $depth);
         }
 
         $stack[$className] = ($stack[$className] ?? 0) + 1;
 
         $isRootLevel = 0 === $depth;
-        $nestedTarget = $isRootLevel ? $target : ModelPath::inventVariable("{$target}", 'object');
+        $nestedTarget = $isRootLevel ? $target : new ModelPath('object'.$depth);
 
         $code = '';
         $initialValues = [];
@@ -166,7 +167,7 @@ final class SerializerGenerator
             }
         }
         foreach ($properties as $propertyMetadata) {
-            $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack);
+            $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack, $depth);
         }
 
         $mightBeEmpty = !$this->configuration->shouldSerializeNull() || !$classMetadata->getProperties();
@@ -392,9 +393,9 @@ final class SerializerGenerator
         array $stack,
         int $depth = 0,
     ): string {
-        $index = ModelPath::indexVariable("{$target}");
-        $arrayVar = ModelPath::inventVariable("{$target}", 'array');
-        $value = ModelPath::inventVariable("{$target}", 'value');
+        $index = new ModelPath('index'.$depth);
+        $arrayVar = new ModelPath('array'.$depth);
+        $value = new ModelPath('value'.$depth);
 
         $subType = $type->getSubType();
         $listTarget = $arrayVar;

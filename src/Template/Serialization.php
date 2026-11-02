@@ -52,6 +52,15 @@ else {
 
 EOT;
 
+    private const TMPL_NON_EMPTY_CONDITIONAL = <<<'EOT'
+{% if assignment %}{{assignment}};
+{% endif %}
+if (null !== {{propertyAccessor}} && !(\is_countable({{propertyAccessor}}) && 0 === \count({{propertyAccessor}}))) {
+    {{code}}
+}
+
+EOT;
+
     private const TMPL_INSTANCE_OF_CONDITIONAL = <<<'EOT'
 if ({{propertyAccessor}} instanceof {{class}}) {
     {{code}}
@@ -141,6 +150,15 @@ EOT;
             'condition' => $condition,
             'code' => $code,
             'elseCode' => $elseCode,
+        ]);
+    }
+
+    public function renderNonEmptyConditional(string $propertyAccessor, string $code, ?string $assignment = null): string
+    {
+        return $this->render(self::TMPL_NON_EMPTY_CONDITIONAL, [
+            'propertyAccessor' => $propertyAccessor,
+            'code' => $code,
+            'assignment' => $assignment,
         ]);
     }
 

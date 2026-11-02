@@ -2,6 +2,10 @@
 
 # 3.x
 
+# 3.7.0
+
+* Support JMS `SkipWhenEmpty` for serialization: `null`, empty arrays and empty `Countable`s are left out, even with `serialize_null` enabled
+
 # 3.6.1
 
 * Fix nested array looping

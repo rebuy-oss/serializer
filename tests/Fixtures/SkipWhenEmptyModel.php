@@ -8,7 +8,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use JMS\Serializer\Annotation as Serializer;
 
-class SkipWhenEmpty
+class SkipWhenEmptyModel
 {
     #[Serializer\Type('string')]
     public string $name = '';
@@ -26,7 +26,7 @@ class SkipWhenEmpty
     public Collection $collection;
 
     #[Serializer\SkipWhenEmpty]
-    #[Serializer\Type('array<Tests\Liip\Serializer\Fixtures\SkipWhenEmpty>')]
+    #[Serializer\Type('array<Tests\Liip\Serializer\Fixtures\SkipWhenEmptyModel>')]
     #[Serializer\MaxDepth(2)]
     public array $children = [];
 

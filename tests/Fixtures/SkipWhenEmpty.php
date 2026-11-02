@@ -13,9 +13,6 @@ class SkipWhenEmpty
     #[Serializer\Type('string')]
     public string $name = '';
 
-    /**
-     * @var string[]
-     */
     #[Serializer\SkipWhenEmpty]
     #[Serializer\Type('array<string>')]
     public array $flags = [];
@@ -24,24 +21,15 @@ class SkipWhenEmpty
     #[Serializer\Type('string')]
     public ?string $nullable = null;
 
-    /**
-     * @var string[]|Collection
-     */
     #[Serializer\SkipWhenEmpty]
     #[Serializer\Type('ArrayCollection<string>')]
-    public $collection;
+    public Collection $collection;
 
-    /**
-     * @var SkipWhenEmpty[]
-     */
     #[Serializer\SkipWhenEmpty]
     #[Serializer\Type('array<Tests\Liip\Serializer\Fixtures\SkipWhenEmpty>')]
     #[Serializer\MaxDepth(2)]
     public array $children = [];
 
-    /**
-     * @var string[]
-     */
     #[Serializer\SkipWhenEmpty]
     #[Serializer\Type('array<string>')]
     #[Serializer\Accessor(getter: 'getTags')]
@@ -52,17 +40,11 @@ class SkipWhenEmpty
         $this->collection = new ArrayCollection();
     }
 
-    /**
-     * @return string[]
-     */
     public function getTags(): array
     {
         return $this->tags;
     }
 
-    /**
-     * @param string[] $tags
-     */
     public function setTags(array $tags): void
     {
         $this->tags = $tags;

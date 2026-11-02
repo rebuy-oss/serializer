@@ -38,6 +38,7 @@ use Tests\Liip\Serializer\Fixtures\PrimitiveClassUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrimitiveUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrivateProperty;
 use Tests\Liip\Serializer\Fixtures\RecursionModel;
+use Tests\Liip\Serializer\Fixtures\SkipWhenEmpty;
 use Tests\Liip\Serializer\Fixtures\UnitEnum;
 use Tests\Liip\Serializer\Fixtures\UnknownArraySubType;
 use Tests\Liip\Serializer\Fixtures\Versions;
@@ -292,6 +293,90 @@ class SerializerGeneratorTest extends SerializerTestCase
 
         $data = $functionName($model);
         self::assertSame($expected, $data);
+    }
+
+    public function testSkipWhenEmptyWithEmptyValues(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_SkipWhenEmpty';
+        self::generateSerializers(self::$metadataBuilder, SkipWhenEmpty::class, [$functionName], ['']);
+
+        $data = $functionName(new SkipWhenEmpty(), false);
+
+        self::assertSame(['name' => ''], $data);
+    }
+
+    public function testSkipWhenEmptyWithSerializeNull(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_SkipWhenEmptyWithNull';
+        $alias = SkipWhenEmpty::class.'WithNull';
+        class_alias(SkipWhenEmpty::class, $alias);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
+            'generation' => [
+                'serialization' => ['serialize_null' => true],
+            ],
+        ]);
+
+        $data = $functionName(new SkipWhenEmpty(), false);
+
+        self::assertSame(['name' => ''], $data);
+    }
+
+    public function testSkipWhenEmptyWithValues(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_SkipWhenEmpty';
+        self::generateSerializers(self::$metadataBuilder, SkipWhenEmpty::class, [$functionName], ['']);
+
+        $model = new SkipWhenEmpty();
+        $model->name = 'root';
+        $model->flags = ['hasChildren'];
+        $model->nullable = 'value';
+        $model->collection = new ArrayCollection(['item']);
+        $model->setTags(['tag']);
+
+        $expected = [
+            'name' => 'root',
+            'flags' => ['hasChildren'],
+            'nullable' => 'value',
+            'collection' => ['item'],
+            'tags' => ['tag'],
+        ];
+
+        self::assertSame($expected, $functionName($model, false));
+    }
+
+    public function testSkipWhenEmptyWithRecursion(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_SkipWhenEmpty';
+        self::generateSerializers(self::$metadataBuilder, SkipWhenEmpty::class, [$functionName], ['']);
+
+        $grandChild = new SkipWhenEmpty();
+        $grandChild->name = 'grandchild';
+        $grandChild->children = [new SkipWhenEmpty()];
+        $child = new SkipWhenEmpty();
+        $child->name = 'child';
+        $child->flags = ['hasChildren'];
+        $child->children = [$grandChild];
+        $leaf = new SkipWhenEmpty();
+        $leaf->name = 'leaf';
+        $model = new SkipWhenEmpty();
+        $model->name = 'root';
+        $model->children = [$child, $leaf];
+
+        $expected = [
+            'name' => 'root',
+            'children' => [
+                [
+                    'name' => 'child',
+                    'flags' => ['hasChildren'],
+                    'children' => [
+                        ['name' => 'grandchild'],
+                    ],
+                ],
+                ['name' => 'leaf'],
+            ],
+        ];
+
+        self::assertSame($expected, $functionName($model, false));
     }
 
     public function testEmptyModel(): void

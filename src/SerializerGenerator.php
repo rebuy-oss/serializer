@@ -208,6 +208,10 @@ final class SerializerGenerator
         $shouldSerializeNull = $this->configuration->shouldSerializeNull();
         $setNull = $shouldSerializeNull ? $this->templating->renderAssign($fieldTarget, 'null') : null;
 
+        if ($propertyMetadata->isSkipWhenEmpty()) {
+            return $this->generateCodeForSkipWhenEmptyField($propertyMetadata, $apiVersion, $serializerGroups, $fieldTarget, $modelPath, $stack, $depth);
+        }
+
         if ($propertyMetadata->getAccessor()->hasGetterMethod()) {
             $tempVariable = str_replace(['->', '[', ']', '$'], '', $modelPath).ucfirst($propertyMetadata->getName());
             $value = $this->templating->renderGetter($modelPath, $propertyMetadata->getAccessor()->getGetterMethod());
@@ -238,6 +242,43 @@ final class SerializerGenerator
         return $requiresExplicitNullSet
             ? $this->templating->renderConditional($modelPropertyPath, $serializeField, $setNull)
             : "{$serializeField}\n";
+    }
+
+    /**
+     * @param list<string>                $serializerGroups
+     * @param array<string, positive-int> $stack
+     */
+    private function generateCodeForSkipWhenEmptyField(
+        PropertyMetadata $propertyMetadata,
+        ?string $apiVersion,
+        array $serializerGroups,
+        string $fieldTarget,
+        string $modelPath,
+        array $stack,
+        int $depth,
+    ): string {
+        $type = $propertyMetadata->getType();
+        $nonNullType = ($type instanceof AbstractPropertyType) ? $type->asNullable(false) : $type;
+
+        if ($propertyMetadata->getAccessor()->hasGetterMethod()) {
+            $tempVariable = str_replace(['->', '[', ']', '$'], '', $modelPath).ucfirst($propertyMetadata->getName());
+
+            return $this->templating->renderNonEmptyConditional(
+                '$'.$tempVariable,
+                $this->generateCodeForFieldType($nonNullType, $apiVersion, $serializerGroups, $fieldTarget, '$'.$tempVariable, $stack, $depth + 1),
+                $this->templating->renderTempVariable($tempVariable, $this->templating->renderGetter($modelPath, $propertyMetadata->getAccessor()->getGetterMethod()))
+            );
+        }
+
+        $modelPropertyPath = $modelPath.'->'.$propertyMetadata->getName();
+        if (!$propertyMetadata->isPublic()) {
+            throw new \Exception(\sprintf('Property %s is not public and no getter has been defined. Stack %s', $modelPropertyPath, var_export($stack, true)));
+        }
+
+        return $this->templating->renderNonEmptyConditional(
+            $modelPropertyPath,
+            $this->generateCodeForFieldType($nonNullType, $apiVersion, $serializerGroups, $fieldTarget, $modelPropertyPath, $stack, $depth + 1)
+        );
     }
 
     /**

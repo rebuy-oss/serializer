@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Liip\Serializer;
 
-use Liip\MetadataParser\Metadata\ClassDiscriminatorMetadata;
 use Liip\MetadataParser\Builder;
 use Liip\MetadataParser\Metadata\AbstractPropertyType;
+use Liip\MetadataParser\Metadata\ClassDiscriminatorMetadata;
 use Liip\MetadataParser\Metadata\ClassMetadata;
 use Liip\MetadataParser\Metadata\PropertyMetadata;
 use Liip\MetadataParser\Metadata\PropertyType;
@@ -149,6 +149,10 @@ final class SerializerGenerator
         }
         if ($this->configuration->shouldSerializeNull()) {
             foreach ($properties as $key => $property) {
+                if ($property->isSkipWhenEmpty()) {
+                    continue;
+                }
+
                 $type = $property->getType();
                 $modelPropertyPath = $property->getAccessor()->hasGetterMethod()
                     ? $modelPath->withPath($property->getAccessor()->getGetterMethod().'()')
@@ -224,7 +228,7 @@ final class SerializerGenerator
         $nonNullType = ($type instanceof AbstractPropertyType) ? $type->asNullable(false) : $type;
 
         if ($propertyMetadata->isSkipWhenEmpty()) {
-            return $this->generateCodeForSkipWhenEmptyField($propertyMetadata, $apiVersion, $serializerGroups, $fieldTarget, $modelPath, $stack, $depth);
+            return $this->generateCodeForSkipWhenEmptyField($propertyMetadata, $fieldTarget, $modelPath, $stack, $depth);
         }
 
         if ($propertyMetadata->getAccessor()->hasGetterMethod()) {
@@ -257,15 +261,12 @@ final class SerializerGenerator
     }
 
     /**
-     * @param list<string>                $serializerGroups
      * @param array<string, positive-int> $stack
      */
     private function generateCodeForSkipWhenEmptyField(
         PropertyMetadata $propertyMetadata,
-        ?string $apiVersion,
-        array $serializerGroups,
-        string $fieldTarget,
-        string $modelPath,
+        ModelPath $fieldTarget,
+        ModelPath $modelPath,
         array $stack,
         int $depth,
     ): string {
@@ -273,23 +274,24 @@ final class SerializerGenerator
         $nonNullType = ($type instanceof AbstractPropertyType) ? $type->asNullable(false) : $type;
 
         if ($propertyMetadata->getAccessor()->hasGetterMethod()) {
-            $tempVariable = str_replace(['->', '[', ']', '$'], '', $modelPath).ucfirst($propertyMetadata->getName());
+            $tempVariable = ModelPath::tempVariable([(string) $modelPath, ucfirst($propertyMetadata->getName())]);
+            $value = $modelPath->withPath($propertyMetadata->getAccessor()->getGetterMethod().'()');
 
             return $this->templating->renderNonEmptyConditional(
-                '$'.$tempVariable,
-                $this->generateCodeForFieldType($nonNullType, $apiVersion, $serializerGroups, $fieldTarget, '$'.$tempVariable, $stack, $depth + 1),
-                $this->templating->renderTempVariable($tempVariable, $this->templating->renderGetter($modelPath, $propertyMetadata->getAccessor()->getGetterMethod()))
+                $tempVariable,
+                $this->generateCodeForFieldType($nonNullType, $fieldTarget, $tempVariable, $stack, $depth + 1),
+                $this->templating->renderTempVariable($tempVariable, "{$value}")
             );
         }
 
-        $modelPropertyPath = $modelPath.'->'.$propertyMetadata->getName();
+        $modelProperty = $modelPath->withPath($propertyMetadata->getName());
         if (!$propertyMetadata->isPublic()) {
-            throw new \Exception(\sprintf('Property %s is not public and no getter has been defined. Stack %s', $modelPropertyPath, var_export($stack, true)));
+            throw new \Exception(\sprintf('Property %s is not public and no getter has been defined. Stack %s', $modelProperty, var_export($stack, true)));
         }
 
         return $this->templating->renderNonEmptyConditional(
-            $modelPropertyPath,
-            $this->generateCodeForFieldType($nonNullType, $apiVersion, $serializerGroups, $fieldTarget, $modelPropertyPath, $stack, $depth + 1)
+            $modelProperty,
+            $this->generateCodeForFieldType($nonNullType, $fieldTarget, $modelProperty, $stack, $depth + 1)
         );
     }
 

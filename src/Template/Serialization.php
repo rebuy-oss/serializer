@@ -55,7 +55,7 @@ EOT;
     private const TMPL_NON_EMPTY_CONDITIONAL = <<<'EOT'
 {% if assignment %}{{assignment}};
 {% endif %}
-if (null !== {{propertyAccessor}} && [] !== {{propertyAccessor}} && !({{propertyAccessor}} instanceof \Countable && 0 === \count({{propertyAccessor}}))) {
+if (null !== {{propertyAccessor}} && !(\is_countable({{propertyAccessor}}) && 0 === \count({{propertyAccessor}}))) {
     {{code}}
 }
 

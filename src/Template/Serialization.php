@@ -29,7 +29,7 @@ EOT;
 {% if initialValues %}
 {{target}} = [
 {%- for pair in initialValues ~%}
-        {% if pair.splat is defined and pair.splat is not empty %}...({{ pair.splat }}){% else %}{{ pair.key }} => {{ pair.value }}{% endif %},
+    {{ pair.key }} => {{ pair.value }},
 {%- endfor ~%}
     ];
 {% else -%}
@@ -143,9 +143,8 @@ EOT;
 
     /**
      * @phpstan-param array<array{
-     *     "key": string|null,
+     *     "key": string,
      *     "value": string,
-     *     "splat"?: string|null,
      * }> $initialValues
      */
     public function renderClass(string|ModelPath $target, string $code, array $initialValues = [], bool $withEmptyObject = true): string

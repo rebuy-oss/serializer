@@ -9,6 +9,8 @@ namespace Liip\Serializer\Path;
  */
 final class ArrayPath implements \Stringable
 {
+    use SplitBackTrait;
+
     /**
      * @var AbstractEntry[]
      */
@@ -24,10 +26,20 @@ final class ArrayPath implements \Stringable
         return implode('', $this->path);
     }
 
+    public static function indexVariable(string $path): self
+    {
+        return self::inventVariable($path, 'index');
+    }
+
+    public static function inventVariable(string $path, string $prefix): self
+    {
+        return new self($prefix.mb_strlen($path).ModelPath::distillName($path));
+    }
+
     public function withFieldName(string $component): self
     {
         $clone = clone $this;
-        $clone->path[] = new ArrayEntry('\''.$component.'\'');
+        $clone->path[] = new ArrayEntry(var_export($component, true));
 
         return $clone;
     }

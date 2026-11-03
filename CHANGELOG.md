@@ -2,6 +2,26 @@
 
 # 3.x
 
+# 3.8.0
+
+* New deserialization option `generation.deserialization.null_as_default` (default `true`, set via
+  `options['generation']['deserialization']`). When `false`, an incoming `null` is treated as a real value
+  and assigned to the property instead of being skipped: the generated code guards fields with
+  `array_key_exists()` rather than `isset()`, so a field that is present-but-null is no longer silently
+  left at its default. Default `true` preserves the previous behaviour.
+* Deserialization fixes:
+  * Nullable properties are now handled more correctly: assigned as an expression where possible, otherwise
+    through an explicit `if (null !== ...) ... else ...` so an explicit `null` is no longer lost.
+  * DateTime deserialization null-handling fixes: single-format dates are emitted as an expression, and
+    multi-format dates correctly handle a `null` value instead of passing `null` into `createFromFormat()`.
+* Many deserialization code optimizations:
+  * Enum deserialization now selects the case with a `match() {}` expression instead of a closure-over-`foreach`.
+  * Removed unnecessary `unset()` calls from generated code; temporary variables are now uniquely named so
+    clearing them is no longer required.
+* Many serialization code optimizations:
+  * With `serialize_null` enabled, a class's simple (non-conditional) fields can be serialized in a single statement.
+  * Generic arrays no longer trigger `instanceof` collection checks during serialization.
+
 # 3.7.0
 
 * Support JMS `SkipWhenEmpty` for serialization: `null`, empty arrays and empty `Countable`s are left out, even with `serialize_null` enabled

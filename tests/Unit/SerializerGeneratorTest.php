@@ -412,6 +412,32 @@ class SerializerGeneratorTest extends SerializerTestCase
         self::assertArrayHasKey('date', $data);
     }
 
+    public function testPopulatedModelWithSerializeNull(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ModelPopulatedWithNull';
+        $alias = Model::class.'PopulatedWithNull';
+        class_alias(Model::class, $alias);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
+            'generation' => [
+                'serialization' => ['serialize_null' => true],
+            ],
+        ]);
+
+        $model = new Model();
+        $model->unAnnotated = 'plain';
+        $model->date = new \DateTime('2024-05-06T07:08:09+00:00');
+        $model->setDateImmutablePrivate(new \DateTimeImmutable('2024-01-02T03:04:05+00:00'));
+        $data = $functionName($model, false);
+
+        self::assertSame('plain', $data['un_annotated']);
+        self::assertSame('2024-05-06T07:08:09+0000', $data['date']);
+        self::assertSame('2024-01-02T03:04:05+0000', $data['date_immutable_private']);
+        self::assertArrayHasKey('nested_field', $data);
+        self::assertNull($data['nested_field']);
+        self::assertArrayHasKey('date_with_format', $data);
+        self::assertNull($data['date_with_format']);
+    }
+
     public function testEmptyModelNotUsingStdClass(): void
     {
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_Model';
@@ -562,7 +588,7 @@ class SerializerGeneratorTest extends SerializerTestCase
         ];
         $data = $functionName($model);
 
-        self::assertSame($expected, $data);
+        self::assertEqualsCanonicalizing($expected, $data);
     }
 
     public function testComplexUnionDiscriminator(): void

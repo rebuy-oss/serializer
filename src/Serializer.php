@@ -99,7 +99,7 @@ final class Serializer implements SerializerInterface
      */
     private function arrayToObject(array $data, string $type, ?Context $context): mixed
     {
-        if ($context && ($context->getVersion() || \count($context->getGroups()))) {
+        if ($context instanceof Context && ($context->getVersion() || \count($context->getGroups()))) {
             throw new Exception('Version and group support is not implemented for deserialization. It is only supported for serialization');
         }
 

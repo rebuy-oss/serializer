@@ -29,15 +29,19 @@ use Tests\Liip\Serializer\Fixtures\EnumModel;
 use Tests\Liip\Serializer\Fixtures\InaccessiblePrivateProperty;
 use Tests\Liip\Serializer\Fixtures\Inheritance;
 use Tests\Liip\Serializer\Fixtures\ListModel;
+use Tests\Liip\Serializer\Fixtures\ListOfListModel;
+use Tests\Liip\Serializer\Fixtures\ListOfModel;
 use Tests\Liip\Serializer\Fixtures\Model;
 use Tests\Liip\Serializer\Fixtures\ModelWithAnnotations;
 use Tests\Liip\Serializer\Fixtures\ModelWithCustomType;
 use Tests\Liip\Serializer\Fixtures\MultidimensionalArrayForPrimitive;
 use Tests\Liip\Serializer\Fixtures\Nested;
 use Tests\Liip\Serializer\Fixtures\PostDeserialize;
+use Tests\Liip\Serializer\Fixtures\PrimitiveClassUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrimitiveUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrivateProperty;
 use Tests\Liip\Serializer\Fixtures\RecursionModel;
+use Tests\Liip\Serializer\Fixtures\SkipWhenEmptyModel;
 use Tests\Liip\Serializer\Fixtures\UnitEnum;
 use Tests\Liip\Serializer\Fixtures\UnknownArraySubType;
 use Tests\Liip\Serializer\Fixtures\Versions;
@@ -162,6 +166,60 @@ class SerializerGeneratorTest extends SerializerTestCase
         self::assertSame($expected, $data);
     }
 
+    public function testNestedListsInsideList(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ListOfListModel';
+        self::generateSerializers(self::$metadataBuilder, ListOfListModel::class, [$functionName], ['']);
+
+        $item1 = new ListModel();
+        $item1->listNested = [new Nested('a'), new Nested('b')];
+
+        $item2 = new ListModel();
+        $item2->listNested = [new Nested('c'), new Nested('d')];
+
+        $list = new ListOfListModel();
+        $list->items = [$item1, $item2];
+
+        $expected = [
+            'items' => [
+                ['list_nested' => [['nested_string' => 'a'], ['nested_string' => 'b']]],
+                ['list_nested' => [['nested_string' => 'c'], ['nested_string' => 'd']]],
+            ],
+        ];
+
+        $data = $functionName($list);
+
+        self::assertSame($expected, $data);
+    }
+
+    public function testNestedObjectFieldInsideList(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ListOfModel';
+        self::generateSerializers(self::$metadataBuilder, ListOfModel::class, [$functionName], ['']);
+
+        $item1 = new Model();
+        $item1->apiString = 'api1';
+        $item1->nestedField = new Nested('nested1');
+
+        $item2 = new Model();
+        $item2->apiString = 'api2';
+        $item2->nestedField = new Nested('nested2');
+
+        $list = new ListOfModel();
+        $list->items = [$item1, $item2];
+
+        $expected = [
+            'items' => [
+                ['api_string' => 'api1', 'nested_field' => ['nested_string' => 'nested1']],
+                ['api_string' => 'api2', 'nested_field' => ['nested_string' => 'nested2']],
+            ],
+        ];
+
+        $data = $functionName($list);
+
+        self::assertSame($expected, $data);
+    }
+
     public function testArraysWithUnknownSubType(): void
     {
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_UnknownArraySubType';
@@ -259,6 +317,90 @@ class SerializerGeneratorTest extends SerializerTestCase
         self::assertSame($expected, $data);
     }
 
+    public function testSkipWhenEmptyWithEmptyValues(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_SkipWhenEmptyModel';
+        self::generateSerializers(self::$metadataBuilder, SkipWhenEmptyModel::class, [$functionName], ['']);
+
+        $data = $functionName(new SkipWhenEmptyModel(), false);
+
+        self::assertSame(['name' => ''], $data);
+    }
+
+    public function testSkipWhenEmptyWithSerializeNull(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_SkipWhenEmptyModelWithNull';
+        $alias = SkipWhenEmptyModel::class.'WithNull';
+        class_alias(SkipWhenEmptyModel::class, $alias);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
+            'generation' => [
+                'serialization' => ['serialize_null' => true],
+            ],
+        ]);
+
+        $data = $functionName(new SkipWhenEmptyModel(), false);
+
+        self::assertSame(['name' => ''], $data);
+    }
+
+    public function testSkipWhenEmptyWithValues(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_SkipWhenEmptyModel';
+        self::generateSerializers(self::$metadataBuilder, SkipWhenEmptyModel::class, [$functionName], ['']);
+
+        $model = new SkipWhenEmptyModel();
+        $model->name = 'root';
+        $model->flags = ['hasChildren'];
+        $model->nullable = 'value';
+        $model->collection = new ArrayCollection(['item']);
+        $model->setTags(['tag']);
+
+        $expected = [
+            'name' => 'root',
+            'flags' => ['hasChildren'],
+            'nullable' => 'value',
+            'collection' => ['item'],
+            'tags' => ['tag'],
+        ];
+
+        self::assertSame($expected, $functionName($model, false));
+    }
+
+    public function testSkipWhenEmptyWithRecursion(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_SkipWhenEmptyModel';
+        self::generateSerializers(self::$metadataBuilder, SkipWhenEmptyModel::class, [$functionName], ['']);
+
+        $grandChild = new SkipWhenEmptyModel();
+        $grandChild->name = 'grandchild';
+        $grandChild->children = [new SkipWhenEmptyModel()];
+        $child = new SkipWhenEmptyModel();
+        $child->name = 'child';
+        $child->flags = ['hasChildren'];
+        $child->children = [$grandChild];
+        $leaf = new SkipWhenEmptyModel();
+        $leaf->name = 'leaf';
+        $model = new SkipWhenEmptyModel();
+        $model->name = 'root';
+        $model->children = [$child, $leaf];
+
+        $expected = [
+            'name' => 'root',
+            'children' => [
+                [
+                    'name' => 'child',
+                    'flags' => ['hasChildren'],
+                    'children' => [
+                        ['name' => 'grandchild'],
+                    ],
+                ],
+                ['name' => 'leaf'],
+            ],
+        ];
+
+        self::assertSame($expected, $functionName($model, false));
+    }
+
     public function testEmptyModel(): void
     {
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_Model';
@@ -290,6 +432,32 @@ class SerializerGeneratorTest extends SerializerTestCase
         self::assertArrayHasKey('un_annotated', $data);
         self::assertArrayHasKey('nested_field', $data);
         self::assertArrayHasKey('date', $data);
+    }
+
+    public function testPopulatedModelWithSerializeNull(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ModelPopulatedWithNull';
+        $alias = Model::class.'PopulatedWithNull';
+        class_alias(Model::class, $alias);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
+            'generation' => [
+                'serialization' => ['serialize_null' => true],
+            ],
+        ]);
+
+        $model = new Model();
+        $model->unAnnotated = 'plain';
+        $model->date = new \DateTime('2024-05-06T07:08:09+00:00');
+        $model->setDateImmutablePrivate(new \DateTimeImmutable('2024-01-02T03:04:05+00:00'));
+        $data = $functionName($model, false);
+
+        self::assertSame('plain', $data['un_annotated']);
+        self::assertSame('2024-05-06T07:08:09+0000', $data['date']);
+        self::assertSame('2024-01-02T03:04:05+0000', $data['date_immutable_private']);
+        self::assertArrayHasKey('nested_field', $data);
+        self::assertNull($data['nested_field']);
+        self::assertArrayHasKey('date_with_format', $data);
+        self::assertNull($data['date_with_format']);
     }
 
     public function testEmptyModelNotUsingStdClass(): void
@@ -442,7 +610,7 @@ class SerializerGeneratorTest extends SerializerTestCase
         ];
         $data = $functionName($model);
 
-        self::assertSame($expected, $data);
+        self::assertEqualsCanonicalizing($expected, $data);
     }
 
     public function testComplexUnionDiscriminator(): void
@@ -507,6 +675,35 @@ class SerializerGeneratorTest extends SerializerTestCase
             [0.5],
             [['key' => 'value', 'another_key' => 'another_value']],
         ];
+    }
+
+    public function testPrimitiveClassUnion(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_PrimitiveClassUnionTyping';
+        self::generateSerializers(self::$metadataBuilder, PrimitiveClassUnionTyping::class, [$functionName], [''], [], ['allow_generic_arrays' => true]);
+
+        $model = new PrimitiveClassUnionTyping();
+        $model->classUnion = new VirtualProperties();
+        $model->classUnion->apiString = 'testString';
+
+        $expected = [
+            'class_union' => ['api_string' => 'testString', 'api_string_virtual' => 'testString_virtual'],
+        ];
+        $data = $functionName($model);
+
+        self::assertSame($expected, $data);
+
+        $model = new PrimitiveClassUnionTyping();
+        $model->classUnion = new Model();
+        $model->classUnion->apiString = 'modelApiString';
+        $model->classUnion->detailString = 'modelDetailString';
+
+        $expected = [
+            'class_union' => ['api_string' => 'modelApiString', 'detail_string' => 'modelDetailString'],
+        ];
+        $data = $functionName($model);
+
+        self::assertSame($expected, $data);
     }
 
     /**

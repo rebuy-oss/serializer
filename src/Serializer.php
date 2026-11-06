@@ -147,7 +147,7 @@ final class Serializer implements SerializerInterface
             }
         }
 
-        $cacheKey = $type.'|'.$version.'|'.implode(',', $groups);
+        $cacheKey = $this->buildSerializerCacheKey($type, $version, $groups);
         $function = $this->serializerFunctions[$cacheKey] ?? null;
 
         if (null === $function) {
@@ -172,5 +172,17 @@ final class Serializer implements SerializerInterface
         } catch (\Throwable $t) {
             throw new Exception('Error during serialization', 0, $t);
         }
+    }
+
+    /**
+     * @param list<string> $groups
+     */
+    private function buildSerializerCacheKey(string $type, ?string $version, array $groups): string
+    {
+        if (null === $version && 0 === \count($groups)) {
+            return $type;
+        }
+
+        return $type.'|'.$version.'|'.implode(',', $groups);
     }
 }

@@ -15,8 +15,7 @@ final class Serialization
 
 function {{functionName}}({{className}} $model, bool $useStdClass = true)
 {
-    $emptyHashmap = $useStdClass ? new \stdClass() : [];
-    $emptyObject = $useStdClass ? new \stdClass() : [];
+    $emptyObjectAndHashmap = $useStdClass ? new \stdClass() : [];
 
     {{code}}
 
@@ -38,7 +37,7 @@ EOT;
 {{code}}
 {% if withEmptyObject is defined and withEmptyObject %}
 if ([] === {{target}}) {
-    {{target}} = $emptyObject;
+    {{target}} = $emptyObjectAndHashmap;
 }
 {% endif %}
 
@@ -95,14 +94,14 @@ EOT;
 
     private const TMPL_HASHMAP = <<<'EOT'
 if (0 === \count({{arrayVariable}})) {
-    {{target}} = $emptyHashmap;
+    {{target}} = $emptyObjectAndHashmap;
 } else {
     {{target}} = \array_is_list({{arrayVariable}}) ? new \ArrayObject({{arrayVariable}}) : {{arrayVariable}};
 }
 EOT;
 
     private const TMPL_HASHMAP_EMPTY = <<<'EOT'
-{{target}} = $emptyHashmap;
+{{target}} = $emptyObjectAndHashmap;
 
 EOT;
 

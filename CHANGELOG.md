@@ -22,6 +22,8 @@
   * With `serialize_null` enabled, a class's simple (non-conditional) fields can be serialized in a single statement.
   * Generic arrays no longer trigger `instanceof` collection checks during serialization.
   * Generated serializer functions create one empty `stdClass` per call for empty objects and hashmaps instead of two.
+  * Serializer functions are looked up by class name when no version and no groups are given, without building a
+    composite cache key on each call.
 
 # 3.7.0
 

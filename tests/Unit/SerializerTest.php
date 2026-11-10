@@ -10,10 +10,18 @@ use Liip\MetadataParser\ModelParser\JMSParser;
 use Liip\MetadataParser\ModelParser\PhpDocParser;
 use Liip\MetadataParser\ModelParser\ReflectionParser;
 use Liip\Serializer\Context;
+use Liip\Serializer\Event\PostDeserializeEvent;
+use Liip\Serializer\Event\PostSerializeEvent;
+use Liip\Serializer\Event\PreDeserializeEvent;
+use Liip\Serializer\Event\PreSerializeEvent;
+use Liip\Serializer\Event\SerializerEvent;
 use Liip\Serializer\Exception\Exception;
 use Liip\Serializer\Exception\UnsupportedFormatException;
 use Liip\Serializer\Exception\UnsupportedTypeException;
 use Liip\Serializer\Serializer;
+use PHPUnit\Framework\MockObject\MockObject;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Tests\Liip\Serializer\Fixtures\MultidimensionalArrayForPrimitive;
 use Tests\Liip\Serializer\Fixtures\SerializerFailureModel;
 use Tests\Liip\Serializer\Fixtures\SerializerModel;
@@ -27,6 +35,8 @@ class SerializerTest extends SerializerTestCase
 {
     private static Builder $metadataBuilder;
 
+    private EventDispatcherInterface&MockObject $eventDispatcher;
+
     public static function setUpBeforeClass(): void
     {
         static::$metadataBuilder = self::createMetadataBuilder([
@@ -34,6 +44,11 @@ class SerializerTest extends SerializerTestCase
             new PhpDocParser(),
             new JMSParser(new AnnotationReader()),
         ]);
+    }
+
+    protected function setUp(): void
+    {
+        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
     }
 
     public function testSerialize(): void
@@ -156,6 +171,126 @@ class SerializerTest extends SerializerTestCase
         $data = $transform->fromArray([], SerializerModel::class);
         self::assertInstanceOf(SerializerModel::class, $data);
         self::assertSame('deserializer', $data->field);
+    }
+
+    public function testPreSerializeEventReplacesObject(): void
+    {
+        $dispatcher = new EventDispatcher();
+        $dispatcher->addListener(PreSerializeEvent::class, static function (PreSerializeEvent $event): void {
+            $event->setObject(new \stdClass());
+        });
+
+        $transform = new Serializer(__DIR__.'/../Fixtures', $dispatcher);
+
+        $this->expectException(UnsupportedTypeException::class);
+        $this->expectExceptionMessage(\stdClass::class);
+        $transform->serialize(new SerializerModel(), 'json');
+    }
+
+    public function testPostSerializeEventChangesData(): void
+    {
+        $dispatcher = new EventDispatcher();
+        $dispatcher->addListener(PostSerializeEvent::class, static function (PostSerializeEvent $event): void {
+            $event->setData(['field' => 'changed']);
+        });
+
+        $transform = new Serializer(__DIR__.'/../Fixtures', $dispatcher);
+
+        self::assertSame('{"field":"changed"}', $transform->serialize(new SerializerModel(), 'json'));
+    }
+
+    public function testPreDeserializeEventChangesData(): void
+    {
+        $dispatcher = new EventDispatcher();
+        $dispatcher->addListener(PreDeserializeEvent::class, static function (PreDeserializeEvent $event): void {
+            $event->setData(['field' => 'changed']);
+        });
+
+        $transform = new Serializer(__DIR__.'/../Fixtures', $dispatcher);
+
+        $model = $transform->deserialize('{"field":"original"}', SerializerModel::class, 'json');
+        self::assertSame('changed', $model->field);
+    }
+
+    public function testPreDeserializeEventChangesType(): void
+    {
+        $dispatcher = new EventDispatcher();
+        $dispatcher->addListener(PreDeserializeEvent::class, static function (PreDeserializeEvent $event): void {
+            $event->setType('Unknown\Type');
+        });
+
+        $transform = new Serializer(__DIR__.'/../Fixtures', $dispatcher);
+
+        $this->expectException(UnsupportedTypeException::class);
+        $this->expectExceptionMessage('Unknown\Type');
+        $transform->fromArray([], SerializerModel::class);
+    }
+
+    public function testPostDeserializeEventReplacesObject(): void
+    {
+        $replacement = new SerializerModel();
+        $dispatcher = new EventDispatcher();
+        $dispatcher->addListener(PostDeserializeEvent::class, static function (PostDeserializeEvent $event) use ($replacement): void {
+            $event->setObject($replacement);
+        });
+
+        $transform = new Serializer(__DIR__.'/../Fixtures', $dispatcher);
+
+        self::assertSame($replacement, $transform->deserialize('{}', SerializerModel::class, 'json'));
+    }
+
+    public function testSerializeEventsReceiveContextAndFormat(): void
+    {
+        $context = new Context();
+        $this->eventDispatcher->expects(self::exactly(2))
+            ->method('dispatch')
+            ->with(self::callback(static fn (SerializerEvent $event): bool => $context === $event->getContext() && 'json' === $event->getFormat()))
+            ->willReturnArgument(0)
+        ;
+
+        $transform = new Serializer(__DIR__.'/../Fixtures', $this->eventDispatcher);
+
+        $transform->serialize(new SerializerModel(), 'json', $context);
+    }
+
+    public function testToArrayEventsHaveNoFormat(): void
+    {
+        $this->eventDispatcher->expects(self::exactly(2))
+            ->method('dispatch')
+            ->with(self::callback(static fn (SerializerEvent $event): bool => null === $event->getFormat()))
+            ->willReturnArgument(0)
+        ;
+
+        $transform = new Serializer(__DIR__.'/../Fixtures', $this->eventDispatcher);
+
+        $transform->toArray(new SerializerModel());
+    }
+
+    public function testDeserializeEventsReceiveContextAndFormat(): void
+    {
+        $context = new Context();
+        $this->eventDispatcher->expects(self::exactly(2))
+            ->method('dispatch')
+            ->with(self::callback(static fn (SerializerEvent $event): bool => $context === $event->getContext() && 'json' === $event->getFormat()))
+            ->willReturnArgument(0)
+        ;
+
+        $transform = new Serializer(__DIR__.'/../Fixtures', $this->eventDispatcher);
+
+        $transform->deserialize('{}', SerializerModel::class, 'json', $context);
+    }
+
+    public function testFromArrayEventsHaveNoFormat(): void
+    {
+        $this->eventDispatcher->expects(self::exactly(2))
+            ->method('dispatch')
+            ->with(self::callback(static fn (SerializerEvent $event): bool => null === $event->getFormat()))
+            ->willReturnArgument(0)
+        ;
+
+        $transform = new Serializer(__DIR__.'/../Fixtures', $this->eventDispatcher);
+
+        $transform->fromArray([], SerializerModel::class);
     }
 
     public function testHashmapSerialization(): void

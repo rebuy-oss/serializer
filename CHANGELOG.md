@@ -2,6 +2,16 @@
 
 # 3.x
 
+# 3.9.0
+
+* Dispatch events before and after (de-)serialization of the root object through a (symfony) event dispatcher.
+  Pass an `EventDispatcherInterface` as second argument to the `Serializer` constructor. If none is passed, no events 
+  are dispatched
+  * `PreSerializeEvent`: replace the object before serialization.
+  * `PostSerializeEvent`: change the result array after serialization.
+  * `PreDeserializeEvent`: change the input array and the target type before deserialization.
+  * `PostDeserializeEvent`: replace the object after deserialization.
+
 # 3.8.0
 
 * New deserialization option `generation.deserialization.null_as_default` (default `true`, set via

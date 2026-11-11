@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace Liip\Serializer;
 
+use Liip\Serializer\Event\PostDeserializeEvent;
+use Liip\Serializer\Event\PostSerializeEvent;
+use Liip\Serializer\Event\PreDeserializeEvent;
+use Liip\Serializer\Event\PreSerializeEvent;
 use Liip\Serializer\Exception\Exception;
 use Liip\Serializer\Exception\UnsupportedFormatException;
 use Liip\Serializer\Exception\UnsupportedTypeException;
 use Pnz\JsonException\Json;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * A serializer that loads the pre-generated PHP function for the requested version and groups.
@@ -28,8 +33,10 @@ final class Serializer implements SerializerInterface
      */
     private array $deserializerFunctions = [];
 
-    public function __construct(private readonly string $cacheDirectory)
-    {
+    public function __construct(
+        private readonly string $cacheDirectory,
+        private readonly ?EventDispatcherInterface $eventDispatcher = null,
+    ) {
     }
 
     /**
@@ -45,7 +52,7 @@ final class Serializer implements SerializerInterface
         }
 
         try {
-            return Json::encode($this->objectToArray($data, true, $context), \JSON_UNESCAPED_SLASHES);
+            return Json::encode($this->objectToArray($data, true, $context, $format), \JSON_UNESCAPED_SLASHES);
         } catch (\JsonException $e) {
             throw new Exception(\sprintf('Failed to JSON encode data for %s. This is not supposed to happen.', get_debug_type($data)), 0, $e);
         }
@@ -69,7 +76,7 @@ final class Serializer implements SerializerInterface
             throw new Exception('Failed to JSON decode data. This is not supposed to happen.', 0, $e);
         }
 
-        return $this->arrayToObject($array, $type, $context);
+        return $this->arrayToObject($array, $type, $context, $format);
     }
 
     /**
@@ -80,7 +87,7 @@ final class Serializer implements SerializerInterface
      */
     public function toArray($data, ?Context $context = null): array
     {
-        return $this->objectToArray($data, false, $context);
+        return $this->objectToArray($data, false, $context, null);
     }
 
     /**
@@ -91,16 +98,22 @@ final class Serializer implements SerializerInterface
      */
     public function fromArray(array $data, string $type, ?Context $context = null): mixed
     {
-        return $this->arrayToObject($data, $type, $context);
+        return $this->arrayToObject($data, $type, $context, null);
     }
 
     /**
      * @param mixed[] $data
      */
-    private function arrayToObject(array $data, string $type, ?Context $context): mixed
+    private function arrayToObject(array $data, string $type, ?Context $context, ?string $format): mixed
     {
         if ($context instanceof Context && ($context->getVersion() || \count($context->getGroups()))) {
             throw new Exception('Version and group support is not implemented for deserialization. It is only supported for serialization');
+        }
+
+        if (null !== $this->eventDispatcher) {
+            $event = $this->eventDispatcher->dispatch(new PreDeserializeEvent($data, $type, $context, $format));
+            $data = $event->getData();
+            $type = $event->getType();
         }
 
         $function = $this->deserializerFunctions[$type] ?? null;
@@ -123,20 +136,34 @@ final class Serializer implements SerializerInterface
         }
 
         try {
-            return $function($data);
+            $object = $function($data);
         } catch (\Throwable $t) {
             throw new Exception('Error during deserialization', 0, $t);
         }
+
+        if (null === $this->eventDispatcher) {
+            return $object;
+        }
+
+        $event = $this->eventDispatcher->dispatch(new PostDeserializeEvent($object, $data, $context, $format));
+
+        return $event->getObject();
     }
 
     /**
      * @return mixed[]
      */
-    private function objectToArray(mixed $data, bool $useStdClass, ?Context $context): array
+    private function objectToArray(mixed $data, bool $useStdClass, ?Context $context, ?string $format): array
     {
         if (!\is_object($data)) {
             throw new UnsupportedTypeException('The Liip Serializer only works for objects');
         }
+
+        if (null !== $this->eventDispatcher) {
+            $event = $this->eventDispatcher->dispatch(new PreSerializeEvent($data, $context, $format));
+            $data = $event->getObject();
+        }
+
         $type = $data::class;
         $groups = [];
         $version = null;
@@ -168,10 +195,18 @@ final class Serializer implements SerializerInterface
         }
 
         try {
-            return $function($data, $useStdClass);
+            $array = $function($data, $useStdClass);
         } catch (\Throwable $t) {
             throw new Exception('Error during serialization', 0, $t);
         }
+
+        if (null === $this->eventDispatcher) {
+            return $array;
+        }
+
+        $event = $this->eventDispatcher->dispatch(new PostSerializeEvent($array, $data, $context, $format));
+
+        return $event->getData();
     }
 
     /**

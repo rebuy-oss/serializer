@@ -298,6 +298,8 @@ final readonly class SerializerGenerator
     /**
      * Whether a PropertyType requires the target to be set to null in a separate statement (returns true), or its expression already allows the null case (returns false)
      *
+     * @param PropertyType<*> $type
+     *
      * @return bool True if the type needs a separate statement for the null case
      */
     private function fieldTypeRequiresExplicitNullSet(PropertyType $type): bool
@@ -323,6 +325,9 @@ final readonly class SerializerGenerator
         return true;
     }
 
+    /**
+     * @param PropertyType<*> $type
+     */
     private function generateCodeForFieldTypeValue(PropertyType $type, ModelPath $modelPropertyPath): ?string
     {
         switch ($type) {
@@ -354,6 +359,7 @@ final readonly class SerializerGenerator
     }
 
     /**
+     * @param PropertyType<*>             $type
      * @param array<string, positive-int> $stack
      */
     private function generateCodeForFieldType(
@@ -386,6 +392,7 @@ final readonly class SerializerGenerator
     }
 
     /**
+     * @param PropertyTypeIterable<*>     $type
      * @param array<string, positive-int> $stack
      */
     private function generateCodeForArray(
@@ -441,6 +448,9 @@ final readonly class SerializerGenerator
         return $loop.$this->renderLastArray($type, "{$target}", "{$listTarget}");
     }
 
+    /**
+     * @param PropertyTypeIterable<*> $type
+     */
     private function renderLastArray(PropertyTypeIterable $type, string $target, string $listTarget): string
     {
         if ($type->isHashmap()) {
@@ -499,6 +509,8 @@ final readonly class SerializerGenerator
     }
 
     /**
+     * @param PropertyTypeIterable<*> $type
+     *
      * @phpstan-ignore method.unused
      */
     private static function isArrayForPrimitive(PropertyTypeIterable $type): bool

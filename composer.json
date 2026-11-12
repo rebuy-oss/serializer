@@ -23,15 +23,16 @@
         "php": "^8.4.1",
         "ext-json": "*",
         "pnz/json-exception": "^1.0",
-        "rebuy/metadata-parser": "~2.2.5 || ^2.5.0",
+        "rebuy/metadata-parser": "3.x-dev",
         "symfony/event-dispatcher-contracts": "^3.0",
         "symfony/filesystem": "^6.4 || ^7.4 || ^8.0",
         "symfony/finder": "^6.4 || ^7.4 || ^8.0",
         "symfony/options-resolver": "^6.4 || ^7.4 || ^8.0",
         "symfony/polyfill-php85": "^1.41.0",
-        "twig/twig": "^v3.27.0"
+        "twig/twig": "^3.27.0"
     },
     "require-dev": {
+        "doctrine/annotations": "^2.0.2",
         "doctrine/collections": "^1.6",
         "friendsofphp/php-cs-fixer": "^3.94.2",
         "jms/serializer": "^3",

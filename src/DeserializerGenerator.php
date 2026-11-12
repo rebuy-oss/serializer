@@ -262,6 +262,8 @@ final readonly class DeserializerGenerator
     /**
      * Whether a PropertyType requires the target to be set to null in a separate statement (returns true), or its expression already allows the null case (returns false)
      *
+     * @param PropertyType<*> $type
+     *
      * @return bool True if the type needs a separate statement for the null case
      */
     private function typeDeserializesAsExpression(PropertyType $type): bool
@@ -296,6 +298,7 @@ final readonly class DeserializerGenerator
     }
 
     /**
+     * @param PropertyType<*>             $type
      * @param array<string, positive-int> $stack
      */
     private function generateInnerCodeForFieldType(
@@ -404,6 +407,7 @@ final readonly class DeserializerGenerator
     }
 
     /**
+     * @param PropertyTypeIterable<*>     $type
      * @param array<string, positive-int> $stack
      */
     private function generateCodeForArray(
@@ -453,6 +457,7 @@ final readonly class DeserializerGenerator
     }
 
     /**
+     * @param PropertyTypeIterable<*>     $type
      * @param array<string, positive-int> $stack
      */
     private function generateCodeForArrayCollection(

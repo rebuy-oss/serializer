@@ -6,6 +6,7 @@ use Rector\CodeQuality\Rector\Class_\InlineConstructorDefaultToPropertyRector;
 use Rector\Config\RectorConfig;
 use Rector\Php74\Rector\Closure\ClosureToArrowFunctionRector;
 use Rector\Set\ValueObject\SetList;
+use Rector\TypeDeclaration\Rector\Class_\ObjectTypedPropertyFromJMSSerializerAttributeTypeRector;
 
 return RectorConfig::configure()
     ->withPaths([
@@ -17,7 +18,10 @@ return RectorConfig::configure()
             InlineConstructorDefaultToPropertyRector::class,
         ]
     )
-    ->withSkip([ClosureToArrowFunctionRector::class])
+    ->withSkip([
+        ClosureToArrowFunctionRector::class,
+        ObjectTypedPropertyFromJMSSerializerAttributeTypeRector::class,
+    ])
     ->withPhpSets()
     ->withSets([SetList::TYPE_DECLARATION])
     ->withImportNames(importShortClasses: false)

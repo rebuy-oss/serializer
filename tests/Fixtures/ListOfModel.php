@@ -10,8 +10,7 @@ class ListOfModel
 {
     /**
      * @var Model[]
-     *
-     * @Serializer\Type("array<Tests\Liip\Serializer\Fixtures\Model>")
      */
+    #[Serializer\Type('array<'.Model::class.'>')]
     public $items;
 }

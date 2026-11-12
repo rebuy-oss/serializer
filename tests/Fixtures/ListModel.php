@@ -18,7 +18,7 @@ class ListModel
     /**
      * @var Nested[]
      */
-    #[Serializer\Type('array<'.Nested::class.'>>')]
+    #[Serializer\Type('array<'.Nested::class.'>')]
     public $listNested;
 
     /**

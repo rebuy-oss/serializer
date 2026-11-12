@@ -8,30 +8,20 @@ use JMS\Serializer\Annotation as Serializer;
 
 class DefaultValues
 {
-    /**
-     * @Serializer\Type("array<string>")
-     */
+    #[Serializer\Type('array<string>')]
     public ?array $list = [];
 
     public ?Nested $nested = null;
 
-    /**
-     * @Serializer\Type("DateTimeImmutable")
-     */
+    #[Serializer\Type('DateTimeImmutable')]
     public $createdAt;
 
-    /**
-     * @Serializer\Type("DateTimeImmutable<'Y-m-d'>")
-     */
+    #[Serializer\Type("DateTimeImmutable<'Y-m-d'>")]
     public $updatedAt;
 
-    /**
-     * @Serializer\Type("DateTimeImmutable<'Ymd', 'UTC', ['d/m/Y', 'Ymd']>")
-     */
+    #[Serializer\Type("DateTimeImmutable<'Ymd', 'UTC', ['d/m/Y', 'Ymd']>")]
     public $plannedFor;
 
-    /**
-     * @Serializer\Type("enum<'Tests\Liip\Serializer\Fixtures\BackedStringEnum'>")
-     */
+    #[Serializer\Type('enum<'.BackedStringEnum::class.'>')]
     public $stringEnum;
 }

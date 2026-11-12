@@ -34,7 +34,6 @@ This step needs to be executed during the deployment phase and whenever your
 models change.
 
 ```php
-use Doctrine\Common\Annotations\AnnotationReader;
 use Liip\MetadataParser\Builder;
 use Liip\MetadataParser\Parser;
 use Liip\MetadataParser\RecursionChecker;
@@ -82,7 +81,8 @@ $configuration = GeneratorConfiguration::createFromArray([
 $parsers = [
     new ReflectionParser(),
     new PhpDocParser(),
-    new JMSParser(new AnnotationReader()),
+    // For JMS models with Doctrine annotations, install doctrine/annotations and use new JMSParser(new AnnotationReader())
+    new JMSParser(),
     new LiipMetadataAttributeParser(),
 ];
 $builder = new Builder(new Parser($parsers), new RecursionChecker(null, []));

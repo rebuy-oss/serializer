@@ -4,7 +4,11 @@
 
 # 4.0.0 (unreleased)
 
-* Raise minium supported PHP version to `8.4.1`
+* Raise minimum supported PHP version to `8.4.1`
+* Update `rebuy/metadata-parser` to `3.x`
+  `doctrine/annotations` is no longer installed by default. Models that use JMS attributes need no change: create the
+  parser with `new JMSParser()`. If your models still use Doctrine annotations, run
+  `composer require doctrine/annotations` and pass the reader to the parser: `new JMSParser(new AnnotationReader())`.
 * Update to PHPUnit `13.1.x`
 * Add `phpbench/phpbench` and some benchmarks
 * Improve performance of (de)serialization by adjusting the generated code a bit

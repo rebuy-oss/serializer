@@ -18,6 +18,8 @@ use Liip\Serializer\Serializer;
 use Liip\Serializer\SerializerGenerator;
 use Liip\Serializer\Template\Deserialization;
 use Liip\Serializer\Template\Serialization;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfChild;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfModel;
 use Tests\Liip\Serializer\Fixtures\ListModel;
 use Tests\Liip\Serializer\Fixtures\Nested;
 
@@ -51,11 +53,13 @@ final class BenchmarkFactory
             'default_versions' => [''],
             'classes' => [
                 ListModel::class => [],
+                ExcludeIfModel::class => [],
             ],
+            'options' => ['expression_language' => true],
         ]);
 
         new SerializerGenerator(new Serialization(), $configuration, $cacheDir)->generate($builder);
-        new DeserializerGenerator(new Deserialization(), [ListModel::class], $cacheDir)->generate($builder);
+        new DeserializerGenerator(new Deserialization(), [], $cacheDir, $configuration)->generate($builder);
     }
 
     public static function createSerializer(): Serializer
@@ -103,6 +107,29 @@ final class BenchmarkFactory
         $model = new ListModel();
         $model->array = self::createStringArray(3);
         $model->listNested = [self::createNestedArray(0), self::createNestedArray(1)];
+
+        return $model;
+    }
+
+    public static function createExcludeIfModel(int $listSize = self::LIST_SIZE, int $hashmapSize = self::HASHMAP_SIZE): ExcludeIfModel
+    {
+        $model = new ExcludeIfModel();
+        $model->hideSecret = true;
+        $model->name = 'root';
+        $model->secret = 'secret';
+        $model->deserializeOnly = 'deserialize';
+        $model->serializeOnly = 'serialize';
+        $model->withoutContextOnly = 'without context';
+        $model->setVirtual('virtual');
+        $model->child = ExcludeIfChild::create('child');
+
+        for ($i = 0; $i < $listSize; ++$i) {
+            $model->children[] = ExcludeIfChild::create('child'.$i, 0 === $i % 10);
+        }
+
+        for ($i = 0; $i < $hashmapSize; ++$i) {
+            $model->childMap['key'.$i] = ExcludeIfChild::create('child'.$i, 0 === $i % 10);
+        }
 
         return $model;
     }

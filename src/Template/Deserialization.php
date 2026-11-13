@@ -32,7 +32,7 @@ final readonly class Deserialization
     private const string TMPL_FUNCTION = <<<'EOT'
 <?php
 
-function {{functionName}}(array {{jsonPath}}): {{className}}
+function {{functionName}}(array {{jsonPath}}{% if withExpressions %}, ?\Symfony\Component\ExpressionLanguage\ExpressionLanguage $expressionLanguage = null, ?\Liip\Serializer\Context $context = null{% endif %}): {{ nullable ? '?' : '' }}{{className}}
 {
     {{code}}
 
@@ -64,6 +64,16 @@ EOT;
 if (isset({{data}})) {
     {{code}}
 }
+
+EOT;
+
+    private const string TMPL_EXCLUDE_IF_CONDITIONAL = <<<'EOT'
+if (null === $expressionLanguage || !$expressionLanguage->evaluate({{expression}}, ['object' => null, 'context' => $context])) {
+    {{code}}
+}{% if excludedCode is not null %} else {
+    {{excludedCode}}
+}{% endif %}
+
 
 EOT;
 
@@ -192,13 +202,24 @@ EOT;
         $this->twig = new Environment(new ArrayLoader(), ['autoescape' => false]);
     }
 
-    public function renderFunction(string $name, string $className, string $jsonPath, string $code): string
+    public function renderFunction(string $name, string $className, string $jsonPath, string $code, bool $nullable = false, bool $withExpressions = false): string
     {
         return $this->render(self::TMPL_FUNCTION, [
             'functionName' => $name,
             'className' => $className,
             'jsonPath' => $jsonPath,
             'code' => $code,
+            'nullable' => $nullable,
+            'withExpressions' => $withExpressions,
+        ]);
+    }
+
+    public function renderExcludeIfConditional(string $expression, string $code, ?string $excludedCode = null): string
+    {
+        return $this->render(self::TMPL_EXCLUDE_IF_CONDITIONAL, [
+            'expression' => var_export($expression, true),
+            'code' => $code,
+            'excludedCode' => $excludedCode,
         ]);
     }
 

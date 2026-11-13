@@ -15,6 +15,9 @@
 * Fix wrong serialization for hashmaps
 * Rename `GeneratorConfiguration::createFomArray()` to `createFromArray()` (typo fix)
 * Remove dead `Recursion::check()` method
+* Support JMS `Exclude(if: ...)` and `Expose(if: ...)` expressions for serialization and deserialization.
+  Enable the `expression_language` generator option and pass a Symfony `ExpressionLanguage` to the `Serializer`
+  constructor to evaluate them. Without the option, the expressions are ignored.
 
 # 3.x
 

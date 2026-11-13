@@ -32,6 +32,8 @@ final readonly class DeserializerGenerator
 
     private GeneratorConfiguration $configuration;
 
+    private ExclusionResolver $exclusionResolver;
+
     /**
      * @param list<class-string> $classesToGenerate This is a list of FQCN classnames
      */
@@ -43,6 +45,7 @@ final readonly class DeserializerGenerator
     ) {
         $this->filesystem = new Filesystem();
         $this->configuration = $this->createGeneratorConfiguration($configuration, $classesToGenerate);
+        $this->exclusionResolver = new ExclusionResolver($this->configuration->shouldEvaluateExpressions());
     }
 
     public static function buildDeserializerFunctionName(string $className): string
@@ -78,7 +81,9 @@ final readonly class DeserializerGenerator
             $functionName,
             $classMetadata->getClassName(),
             (string) $arrayPath,
-            $this->generateCodeForClass($classMetadata, $arrayPath, new ModelPath('model'))
+            $this->generateCodeForClass($classMetadata, $arrayPath, new ModelPath('model'), isRootLevel: true),
+            $this->exclusionResolver->classMayBeExcluded($classMetadata),
+            $this->exclusionResolver->isEnabled(),
         );
 
         $this->filesystem->dumpFile(\sprintf('%s/%s.php', $this->cacheDirectory, $functionName), $code);
@@ -92,6 +97,7 @@ final readonly class DeserializerGenerator
         ArrayPath $arrayPath,
         ModelPath $modelPath,
         array $stack = [],
+        bool $isRootLevel = false,
     ): string {
         $className = $classMetadata->getClassName();
         $handler = $this->configuration->findDeserializerHandlerForClass($className);
@@ -101,8 +107,28 @@ final readonly class DeserializerGenerator
 
         $discriminatorMetadata = $classMetadata->getDiscriminatorMetadata();
         if (null !== $discriminatorMetadata && $discriminatorMetadata->baseClass == $className) {
-            return $this->generateCodeForDiscriminatorClass($classMetadata, $arrayPath, $modelPath, $stack);
+            return $this->generateCodeForDiscriminatorClass($classMetadata, $arrayPath, $modelPath, $stack, $isRootLevel);
         }
+
+        $code = $this->generateCodeForClassValue($classMetadata, $arrayPath, $modelPath, $stack);
+        $excludeIf = $this->exclusionResolver->excludeIf($classMetadata);
+        if (null === $excludeIf) {
+            return $code;
+        }
+
+        return $this->templating->renderExcludeIfConditional($excludeIf, $code, $isRootLevel ? 'return null;' : null);
+    }
+
+    /**
+     * @param array<string, positive-int> $stack
+     */
+    private function generateCodeForClassValue(
+        ClassMetadata $classMetadata,
+        ArrayPath $arrayPath,
+        ModelPath $modelPath,
+        array $stack,
+    ): string {
+        $className = $classMetadata->getClassName();
 
         $stack[$className] = ($stack[$className] ?? 0) + 1;
 
@@ -125,19 +151,34 @@ final readonly class DeserializerGenerator
                 $getValue = $this->generateInnerCodeForFieldType($propertyType, $propertyArrayPath, $tempVariable, $stack);
 
                 if ($this->configuration->shouldTreatNullAsDefault()) {
-                    $initCode .= $this->templating->renderArgument(
+                    $argumentCode = $this->templating->renderArgument(
                         (string) $tempVariable,
                         $default,
                         $this->templating->renderConditional((string) $propertyArrayPath, $getValue)
                     );
                 } else {
-                    $initCode .= $this->templating->renderDynamicKeyExistsConditional(
+                    $argumentCode = $this->templating->renderDynamicKeyExistsConditional(
                         (string) $arrayPath,
                         var_export($propertyMetadata->getSerializedName(), true),
                         $getValue,
                         $this->templating->renderArgument((string) $tempVariable, $default, null),
                     );
                 }
+
+                if ($this->exclusionResolver->typeMayBeExcluded($propertyType)) {
+                    $argumentCode = $this->templating->renderArgument((string) $tempVariable, $default, $argumentCode);
+                }
+
+                $excludeIf = $this->exclusionResolver->excludeIf($propertyMetadata);
+                if (null !== $excludeIf) {
+                    $argumentCode = $this->templating->renderExcludeIfConditional(
+                        $excludeIf,
+                        $argumentCode,
+                        $this->templating->renderArgument((string) $tempVariable, $default, null),
+                    );
+                }
+
+                $initCode .= $argumentCode;
             } else {
                 $code .= $this->generateCodeForProperty($propertyMetadata, $propertyArrayPath, $modelPath, $stack);
             }
@@ -177,6 +218,7 @@ final readonly class DeserializerGenerator
         ArrayPath $arrayPath,
         ModelPath $modelPath,
         array $stack = [],
+        bool $isRootLevel = false,
     ): string {
         $code = '';
         $discriminatorMetadata = $classMetadata->getDiscriminatorMetadata();
@@ -185,7 +227,7 @@ final readonly class DeserializerGenerator
             $code .= $this->templating->renderDiscriminatorConditional(
                 (string) $discriminatorFieldPath,
                 $typeValue,
-                $this->generateCodeForClass($discriminatorMetadata->getMetadataForClass($class), $arrayPath, $modelPath, $stack)
+                $this->generateCodeForClass($discriminatorMetadata->getMetadataForClass($class), $arrayPath, $modelPath, $stack, $isRootLevel)
             );
         }
 
@@ -209,6 +251,24 @@ final readonly class DeserializerGenerator
             return '';
         }
 
+        $code = $this->generateCodeForPropertyValue($propertyMetadata, $arrayPath, $modelPath, $stack);
+        $excludeIf = $this->exclusionResolver->excludeIf($propertyMetadata);
+        if (null === $excludeIf) {
+            return $code;
+        }
+
+        return $this->templating->renderExcludeIfConditional($excludeIf, $code);
+    }
+
+    /**
+     * @param array<string, positive-int> $stack
+     */
+    private function generateCodeForPropertyValue(
+        PropertyMetadata $propertyMetadata,
+        ArrayPath $arrayPath,
+        ModelPath $modelPath,
+        array $stack,
+    ): string {
         /** @var non-empty-list<ArrayEntry> $arrayPathLastKey */
         [$arrayPathBase, $arrayPathLastKey] = $arrayPath->splitBack();
         $arrayPathLastKey = array_pop($arrayPathLastKey)->getPath();
@@ -219,14 +279,22 @@ final readonly class DeserializerGenerator
             $getValue = $this->generateInnerCodeForFieldType($propertyType, $arrayPath, $tempVariable, $stack);
             $setIntoModel = $this->templating->renderSetter((string) $modelPath, $propertyMetadata->getAccessor()->getSetterMethod(), (string) $tempVariable);
 
+            // An excluded class does not assign the temporary variable, and a value from an earlier loop iteration must not stay in it.
+            $mayBeExcluded = $this->exclusionResolver->typeMayBeExcluded($propertyType);
+            $unsetCode = $mayBeExcluded ? $this->templating->renderUnset([(string) $tempVariable]) : '';
+
             if ($this->configuration->shouldTreatNullAsDefault()) {
-                $code = $this->templating->renderConditional((string) $arrayPath, $getValue);
+                $code = $unsetCode.$this->templating->renderConditional((string) $arrayPath, $getValue);
                 $code .= $this->templating->renderConditional((string) $tempVariable, $setIntoModel);
-            } else {
-                $code = $this->templating->renderDynamicKeyExistsConditional((string) $arrayPathBase, (string) $arrayPathLastKey, "{$getValue}    {$setIntoModel}");
+
+                return $code;
             }
 
-            return $code;
+            if ($mayBeExcluded) {
+                $setIntoModel = $this->templating->renderIsNotNullConditional("({$tempVariable} ?? null)", $setIntoModel, null);
+            }
+
+            return $unsetCode.$this->templating->renderDynamicKeyExistsConditional((string) $arrayPathBase, (string) $arrayPathLastKey, "{$getValue}    {$setIntoModel}");
         }
 
         $modelPropertyPath = $modelPath->withPath($propertyMetadata->getName());
@@ -452,6 +520,11 @@ final readonly class DeserializerGenerator
 
         $code = $this->templating->renderInitArray((string) $modelPath);
         $code .= $this->templating->renderLoop((string) $arrayPath, (string) $index, (string) $value, $innerCode);
+
+        // Excluded items leave gaps in the keys of a list.
+        if (!$type->isHashmap() && $this->exclusionResolver->typeMayBeExcluded($subType)) {
+            $code .= $this->templating->renderAssignJsonDataToField((string) $modelPath, "\\array_values({$modelPath})")."\n";
+        }
 
         return $code;
     }

@@ -50,6 +50,7 @@ use Liip\Serializer\Template\Serialization;
 $configuration = GeneratorConfiguration::createFromArray([
     'options' => [
         'allow_generic_arrays' => false,
+        'expression_language' => false, // optional, default is `false`
         'generation' => [
             'serialization' => [
                 'serialize_null' => false // optional, default is `false`
@@ -299,6 +300,57 @@ $dispatcher->addListener(PostSerializeEvent::class, static function (PostSeriali
 });
 
 $serializer = new Serializer($cacheDirectory, $dispatcher);
+```
+
+## Expressions
+
+> [!IMPORTANT]
+> Expressions make (de-)serialization slower, because every expression is evaluated at runtime. Give the
+> `ExpressionLanguage` a cache that does not serialize its values, like `new ArrayAdapter(deepClone: false)`
+> (`storeSerialized` in older Symfony versions). The default cache is about 5 times slower.
+
+Like JMS Serializer, the rebuy Serializer supports expressions in the JMS attributes `#[Exclude(if: ...)]` and
+`#[Expose(if: ...)]` on properties and in `#[Exclude(if: ...)]` on classes. To use them, install the expression
+language with `composer require symfony/expression-language`.
+
+The expressions are only added to the generated code when you set the `expression_language` option to `true`. At
+runtime, they are only evaluated when you pass an `ExpressionLanguage` as third argument to the `Serializer`.
+
+> [!WARNING]
+> Without the `expression_language` option, the expressions are silently ignored and all properties are
+> (de-)serialized, even the ones an expression should hide. Enable the option if your models use expressions.
+
+The expressions get these variables:
+
+| Variable  | Value                                                                     |
+|-----------|---------------------------------------------------------------------------|
+| `object`  | The object that holds the property, or the object itself on a class level |
+| `context` | The `Context` passed to the `Serializer`, or `null`                       |
+
+Like in JMS, `object` is `null` when deserializing.
+
+Unlike JMS, `property_metadata` and `class_metadata` are not available.
+
+An excluded object is handled like `null`: the field is left out, or written as `null` when `serialize_null` is
+enabled. An excluded root object is serialized as an empty object and deserializes to `null`.
+
+In this example, we enable expressions for the generated files and pass an `ExpressionLanguage` to the `Serializer`:
+
+```php
+use Liip\Serializer\Configuration\GeneratorConfiguration;
+use Liip\Serializer\Serializer;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
+
+$configuration = GeneratorConfiguration::createFromArray([
+    'options' => ['expression_language' => true],
+    // ...
+]);
+
+// Generate the files as described above.
+
+$expressionLanguage = new ExpressionLanguage(new ArrayAdapter(deepClone: false));
+$serializer = new Serializer($cacheDirectory, $dispatcher, $expressionLanguage);
 ```
 
 # Where do I go for help?

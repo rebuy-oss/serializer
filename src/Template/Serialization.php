@@ -13,7 +13,7 @@ final readonly class Serialization
     private const string TMPL_FUNCTION = <<<'EOT'
 <?php
 
-function {{functionName}}({{className}} $model, bool $useStdClass = true)
+function {{functionName}}({{className}} $model, bool $useStdClass = true{% if withExpressions %}, ?\Symfony\Component\ExpressionLanguage\ExpressionLanguage $expressionLanguage = null, ?\Liip\Serializer\Context $context = null{% endif %})
 {
     $emptyObjectAndHashmap = $useStdClass ? new \stdClass() : [];
 
@@ -62,6 +62,16 @@ EOT;
 if (null !== {{propertyAccessor}} && !(\is_countable({{propertyAccessor}}) && 0 === \count({{propertyAccessor}}))) {
     {{code}}
 }
+
+EOT;
+
+    private const string TMPL_EXCLUDE_IF_CONDITIONAL = <<<'EOT'
+if (null === $expressionLanguage || !$expressionLanguage->evaluate({{expression}}, ['object' => {{object}}, 'context' => $context])) {
+    {{code}}
+}{% if excludedCode is not null %} else {
+    {{excludedCode}}
+}{% endif %}
+
 
 EOT;
 
@@ -131,12 +141,13 @@ EOT;
         $this->twig = new Environment(new ArrayLoader(), ['autoescape' => false]);
     }
 
-    public function renderFunction(string $name, string $className, string $code): string
+    public function renderFunction(string $name, string $className, string $code, bool $withExpressions = false): string
     {
         return $this->render(self::TMPL_FUNCTION, [
             'functionName' => $name,
             'className' => $className,
             'code' => $code,
+            'withExpressions' => $withExpressions,
         ]);
     }
 
@@ -171,6 +182,16 @@ EOT;
             'propertyAccessor' => $propertyAccessor,
             'code' => $code,
             'assignment' => $assignment,
+        ]);
+    }
+
+    public function renderExcludeIfConditional(string $expression, string|ModelPath $object, string $code, ?string $excludedCode = null): string
+    {
+        return $this->render(self::TMPL_EXCLUDE_IF_CONDITIONAL, [
+            'expression' => var_export($expression, true),
+            'object' => $object,
+            'code' => $code,
+            'excludedCode' => $excludedCode,
         ]);
     }
 

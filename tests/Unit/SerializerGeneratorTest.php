@@ -11,8 +11,10 @@ use Liip\MetadataParser\Builder;
 use Liip\MetadataParser\ModelParser\JMSParser;
 use Liip\MetadataParser\ModelParser\PhpDocParser;
 use Liip\MetadataParser\ModelParser\ReflectionParser;
+use Liip\Serializer\Context;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Medium;
+use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Tests\Liip\Serializer\Fixtures\AccessorOrder;
 use Tests\Liip\Serializer\Fixtures\AccessorOrderInherit;
 use Tests\Liip\Serializer\Fixtures\BackedIntEnum;
@@ -26,6 +28,8 @@ use Tests\Liip\Serializer\Fixtures\DiscriminatorComment;
 use Tests\Liip\Serializer\Fixtures\DiscriminatorDependency;
 use Tests\Liip\Serializer\Fixtures\DiscriminatorFirstChild;
 use Tests\Liip\Serializer\Fixtures\EnumModel;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfChild;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfModel;
 use Tests\Liip\Serializer\Fixtures\InaccessiblePrivateProperty;
 use Tests\Liip\Serializer\Fixtures\Inheritance;
 use Tests\Liip\Serializer\Fixtures\ListModel;
@@ -50,6 +54,8 @@ use Tests\Liip\Serializer\Fixtures\VirtualProperties;
 #[Medium]
 class SerializerGeneratorTest extends SerializerTestCase
 {
+    private const array WITH_EXPRESSIONS = ['expression_language' => true];
+
     private static Builder $metadataBuilder;
 
     public static function setUpBeforeClass(): void
@@ -866,5 +872,142 @@ class SerializerGeneratorTest extends SerializerTestCase
         $this->expectExceptionMessage('is not public and no getter has been defined');
 
         self::generateSerializers(self::$metadataBuilder, InaccessiblePrivateProperty::class, ['should never get here']);
+    }
+
+    public function testExcludeIfIsNotGeneratedWithoutOptIn(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModelSerializeWithoutExpressions';
+        $alias = ExcludeIfModel::class.'SerializeWithoutExpressions';
+        class_alias(ExcludeIfModel::class, $alias);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], ['']);
+
+        $data = $functionName(self::createExcludeIfModel(), false, new ExpressionLanguage());
+        $parameters = array_map(
+            static fn (\ReflectionParameter $parameter): string => $parameter->getName(),
+            new \ReflectionFunction($functionName)->getParameters(),
+        );
+
+        $expected = [
+            'name' => 'root',
+            'secret' => 'secret',
+            'deserialize_only' => 'deserialize',
+            'serialize_only' => 'serialize',
+            'without_context_only' => 'without context',
+            'virtual' => 'virtual',
+            'child' => ['name' => 'hidden child'],
+            'children' => [['name' => 'a'], ['name' => 'b'], ['name' => 'c']],
+            'child_map' => ['x' => ['name' => 'x'], 'y' => ['name' => 'y']],
+        ];
+
+        self::assertSame(['model', 'useStdClass'], $parameters);
+        self::assertSame($expected, $data);
+    }
+
+    public function testExcludeIfIsIgnoredWithoutExpressionLanguage(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel';
+        self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, [$functionName], [''], options: self::WITH_EXPRESSIONS);
+
+        $data = $functionName(self::createExcludeIfModel(), false);
+
+        $expected = [
+            'name' => 'root',
+            'secret' => 'secret',
+            'deserialize_only' => 'deserialize',
+            'serialize_only' => 'serialize',
+            'without_context_only' => 'without context',
+            'virtual' => 'virtual',
+            'child' => ['name' => 'hidden child'],
+            'children' => [['name' => 'a'], ['name' => 'b'], ['name' => 'c']],
+            'child_map' => ['x' => ['name' => 'x'], 'y' => ['name' => 'y']],
+        ];
+
+        self::assertSame($expected, $data);
+    }
+
+    public function testExcludeIf(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel';
+        self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, [$functionName], [''], options: self::WITH_EXPRESSIONS);
+
+        $data = $functionName(self::createExcludeIfModel(), false, new ExpressionLanguage());
+
+        $expected = [
+            'name' => 'root',
+            'serialize_only' => 'serialize',
+            'without_context_only' => 'without context',
+            'children' => [['name' => 'a'], ['name' => 'c']],
+            'child_map' => ['y' => ['name' => 'y']],
+        ];
+
+        self::assertSame($expected, $data);
+    }
+
+    public function testExcludeIfWithContext(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel';
+        self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, [$functionName], [''], options: self::WITH_EXPRESSIONS);
+
+        $data = $functionName(self::createExcludeIfModel(), false, new ExpressionLanguage(), new Context());
+
+        self::assertArrayNotHasKey('without_context_only', $data);
+    }
+
+    public function testExcludeIfWithSerializeNull(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModelWithNull';
+        $alias = ExcludeIfModel::class.'WithNull';
+        class_alias(ExcludeIfModel::class, $alias);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
+            'expression_language' => true,
+            'generation' => [
+                'serialization' => ['serialize_null' => true],
+            ],
+        ]);
+
+        $data = $functionName(self::createExcludeIfModel(), false, new ExpressionLanguage());
+
+        $expected = [
+            'name' => 'root',
+            'serialize_only' => 'serialize',
+            'without_context_only' => 'without context',
+            'child' => null,
+            'children' => [['name' => 'a'], null, ['name' => 'c']],
+            'child_map' => ['x' => null, 'y' => ['name' => 'y']],
+        ];
+
+        self::assertSame($expected, $data);
+    }
+
+    public function testExcludeIfOnRootClass(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfChild';
+        self::generateSerializers(self::$metadataBuilder, ExcludeIfChild::class, [$functionName], [''], options: self::WITH_EXPRESSIONS);
+
+        $data = $functionName(ExcludeIfChild::create('hidden', true), true, new ExpressionLanguage());
+        self::assertEquals(new \stdClass(), $data);
+
+        $data = $functionName(ExcludeIfChild::create('hidden', true), false, new ExpressionLanguage());
+        self::assertSame([], $data);
+
+        $data = $functionName(ExcludeIfChild::create('visible'), false, new ExpressionLanguage());
+        self::assertSame(['name' => 'visible'], $data);
+    }
+
+    private static function createExcludeIfModel(): ExcludeIfModel
+    {
+        $model = new ExcludeIfModel();
+        $model->hideSecret = true;
+        $model->name = 'root';
+        $model->secret = 'secret';
+        $model->deserializeOnly = 'deserialize';
+        $model->serializeOnly = 'serialize';
+        $model->withoutContextOnly = 'without context';
+        $model->setVirtual('virtual');
+        $model->child = ExcludeIfChild::create('hidden child', true);
+        $model->children = [ExcludeIfChild::create('a'), ExcludeIfChild::create('b', true), ExcludeIfChild::create('c')];
+        $model->childMap = ['x' => ExcludeIfChild::create('x', true), 'y' => ExcludeIfChild::create('y')];
+
+        return $model;
     }
 }

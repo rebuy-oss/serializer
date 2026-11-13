@@ -73,6 +73,7 @@ class GeneratorConfiguration implements \IteratorAggregate
      * [
      *     'options' => [
      *         'allow_generic_arrays' => true,
+     *         'expression_language' => true,
      *         'generation' => [
      *              'serialization' => ['serialize_null => true],
      *              'deserialization' => ['null_as_default => false],
@@ -158,6 +159,11 @@ class GeneratorConfiguration implements \IteratorAggregate
         return $this->options['allow_generic_arrays'];
     }
 
+    public function shouldEvaluateExpressions(): bool
+    {
+        return $this->options['expression_language'];
+    }
+
     /**
      * @param class-string $className
      */
@@ -217,6 +223,7 @@ class GeneratorConfiguration implements \IteratorAggregate
         $resolver = new OptionsResolver();
         $resolver->setDefaults([
             'allow_generic_arrays' => false,
+            'expression_language' => false,
             'handlers' => [],
             'generation' => [
                 'serialization' => [
@@ -229,6 +236,7 @@ class GeneratorConfiguration implements \IteratorAggregate
         ]);
 
         $resolver->setAllowedTypes('allow_generic_arrays', 'boolean');
+        $resolver->setAllowedTypes('expression_language', 'boolean');
         $resolver->setAllowedTypes('handlers', 'array');
 
         // This is insanity, but the issue is that symfony/options-resolver 4.x uses setDefault() for nested options, but

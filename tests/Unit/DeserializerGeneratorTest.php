@@ -11,10 +11,12 @@ use Liip\MetadataParser\Builder;
 use Liip\MetadataParser\ModelParser\JMSParser;
 use Liip\MetadataParser\ModelParser\PhpDocParser;
 use Liip\MetadataParser\ModelParser\ReflectionParser;
+use Liip\Serializer\Context;
 use Liip\Serializer\DeserializerGenerator;
 use Liip\Serializer\Template\Deserialization;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Medium;
+use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Tests\Liip\Serializer\Fixtures\BackedIntEnum;
 use Tests\Liip\Serializer\Fixtures\BackedStringEnum;
 use Tests\Liip\Serializer\Fixtures\ComplexUnionTyping;
@@ -28,6 +30,10 @@ use Tests\Liip\Serializer\Fixtures\DiscriminatorDependency;
 use Tests\Liip\Serializer\Fixtures\DiscriminatorFirstChild;
 use Tests\Liip\Serializer\Fixtures\DiscriminatorSecondChild;
 use Tests\Liip\Serializer\Fixtures\EnumModel;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfConstructorModel;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfDeserializationChild;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfDeserializationModel;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfModel;
 use Tests\Liip\Serializer\Fixtures\FloatProperty;
 use Tests\Liip\Serializer\Fixtures\Inheritance;
 use Tests\Liip\Serializer\Fixtures\ListModel;
@@ -48,6 +54,8 @@ use Tests\Liip\Serializer\Fixtures\VirtualProperties;
 #[Medium]
 class DeserializerGeneratorTest extends SerializerTestCase
 {
+    private const array WITH_EXPRESSIONS = ['expression_language' => true];
+
     private static Builder $metadataBuilder;
 
     public static function setUpBeforeClass(): void
@@ -540,5 +548,154 @@ class DeserializerGeneratorTest extends SerializerTestCase
         self::assertNull($model->updatedAt);
         self::assertNull($model->plannedFor);
         self::assertNull($model->stringEnum);
+    }
+
+    public function testExcludeIfIsNotGeneratedWithoutOptIn(): void
+    {
+        $alias = ExcludeIfModel::class.'DeserializeWithoutExpressions';
+        $functionName = DeserializerGenerator::buildDeserializerFunctionName($alias);
+        class_alias(ExcludeIfModel::class, $alias);
+        self::generateDeserializer(self::$metadataBuilder, $alias, $functionName);
+
+        /** @var ExcludeIfModel $model */
+        $model = $functionName(self::createExcludeIfModelData(), new ExpressionLanguage());
+        $parameters = array_map(
+            static fn (\ReflectionParameter $parameter): string => $parameter->getName(),
+            new \ReflectionFunction($functionName)->getParameters(),
+        );
+
+        self::assertSame(['jsonData'], $parameters);
+        self::assertSame('deserialize', $model->deserializeOnly);
+        self::assertSame('serialize', $model->serializeOnly);
+        self::assertSame('without context', $model->withoutContextOnly);
+    }
+
+    public function testExcludeIfIsIgnoredWithoutExpressionLanguage(): void
+    {
+        $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel';
+        self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, $functionName, self::WITH_EXPRESSIONS);
+
+        /** @var ExcludeIfModel $model */
+        $model = $functionName(self::createExcludeIfModelData());
+
+        self::assertSame('deserialize', $model->deserializeOnly);
+        self::assertSame('serialize', $model->serializeOnly);
+        self::assertSame('without context', $model->withoutContextOnly);
+    }
+
+    public function testExcludeIf(): void
+    {
+        $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel';
+        self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, $functionName, self::WITH_EXPRESSIONS);
+
+        /** @var ExcludeIfModel $model */
+        $model = $functionName(self::createExcludeIfModelData(), new ExpressionLanguage());
+
+        self::assertSame('root', $model->name);
+        self::assertSame('secret', $model->secret);
+        self::assertSame('virtual', $model->getVirtual());
+        self::assertSame('deserialize', $model->deserializeOnly);
+        self::assertNull($model->serializeOnly);
+        self::assertSame('without context', $model->withoutContextOnly);
+        self::assertSame('child', $model->child?->name);
+    }
+
+    public function testExcludeIfWithContext(): void
+    {
+        $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel';
+        self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, $functionName, self::WITH_EXPRESSIONS);
+
+        /** @var ExcludeIfModel $model */
+        $model = $functionName(self::createExcludeIfModelData(), new ExpressionLanguage(), new Context());
+
+        self::assertNull($model->withoutContextOnly);
+    }
+
+    #[DataProvider('provideNullAsDefault')]
+    public function testClassExcludeIf(bool $nullAsDefault): void
+    {
+        $alias = ExcludeIfDeserializationModel::class.($nullAsDefault ? 'NullAsDefault' : 'NullNotAsDefault');
+        $functionName = DeserializerGenerator::buildDeserializerFunctionName($alias);
+        class_alias(ExcludeIfDeserializationModel::class, $alias);
+        self::generateDeserializer(self::$metadataBuilder, $alias, $functionName, [
+            'expression_language' => true,
+            'generation' => ['deserialization' => ['null_as_default' => $nullAsDefault]],
+        ]);
+        $input = [
+            'name' => 'root',
+            'child' => ['name' => 'child'],
+            'setter_child' => ['name' => 'setter child'],
+            'children' => [['name' => 'a'], ['name' => 'b']],
+        ];
+
+        /** @var ExcludeIfDeserializationModel $model */
+        $model = $functionName($input);
+        self::assertSame('child', $model->child?->name);
+        self::assertSame('setter child', $model->getSetterChild()?->name);
+        self::assertCount(2, $model->children);
+
+        /** @var ExcludeIfDeserializationModel $model */
+        $model = $functionName($input, new ExpressionLanguage());
+        self::assertSame('root', $model->name);
+        self::assertNull($model->child);
+        self::assertNull($model->getSetterChild());
+        self::assertSame([], $model->children);
+    }
+
+    #[DataProvider('provideNullAsDefault')]
+    public function testExcludeIfOnConstructorArguments(bool $nullAsDefault): void
+    {
+        $alias = ExcludeIfConstructorModel::class.($nullAsDefault ? 'NullAsDefault' : 'NullNotAsDefault');
+        $functionName = DeserializerGenerator::buildDeserializerFunctionName($alias);
+        class_alias(ExcludeIfConstructorModel::class, $alias);
+        self::generateDeserializer(self::$metadataBuilder, $alias, $functionName, [
+            'expression_language' => true,
+            'generation' => ['deserialization' => ['null_as_default' => $nullAsDefault]],
+        ]);
+        $input = ['arguments' => ['excluded' => 'value', 'child' => ['name' => 'child']]];
+
+        /** @var ExcludeIfConstructorModel $model */
+        $model = $functionName($input);
+        self::assertSame('value', $model->arguments?->excluded);
+        self::assertSame('child', $model->arguments?->child?->name);
+
+        /** @var ExcludeIfConstructorModel $model */
+        $model = $functionName($input, new ExpressionLanguage());
+        self::assertSame('default', $model->arguments?->excluded);
+        self::assertNull($model->arguments?->child);
+    }
+
+    public static function provideNullAsDefault(): iterable
+    {
+        yield 'null as default' => [true];
+        yield 'null not as default' => [false];
+    }
+
+    public function testExcludeIfOnRootClass(): void
+    {
+        $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfDeserializationChild';
+        self::generateDeserializer(self::$metadataBuilder, ExcludeIfDeserializationChild::class, $functionName, self::WITH_EXPRESSIONS);
+
+        $model = $functionName(['name' => 'child'], new ExpressionLanguage());
+        self::assertNull($model);
+
+        $model = $functionName(['name' => 'child']);
+        self::assertInstanceOf(ExcludeIfDeserializationChild::class, $model);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function createExcludeIfModelData(): array
+    {
+        return [
+            'name' => 'root',
+            'secret' => 'secret',
+            'deserialize_only' => 'deserialize',
+            'serialize_only' => 'serialize',
+            'without_context_only' => 'without context',
+            'virtual' => 'virtual',
+            'child' => ['name' => 'child'],
+        ];
     }
 }

@@ -22,7 +22,9 @@ use Liip\Serializer\Serializer;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\Attributes\Small;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfModel;
 use Tests\Liip\Serializer\Fixtures\MultidimensionalArrayForPrimitive;
 use Tests\Liip\Serializer\Fixtures\SerializerFailureModel;
 use Tests\Liip\Serializer\Fixtures\SerializerModel;
@@ -309,5 +311,49 @@ class SerializerTest extends SerializerTestCase
         $json = $serializer->serialize($subject, 'json');
 
         self::assertSame('{"two_dims":{"0":[0],"1":[1]},"five_dims":{"0":{"0":{"0":{"0":[2]}}},"1":{"3":{"0":{"0":[3]}}}},"map_of_lists":{"foo":[0],"bar":[1]},"list_of_map_of_lists":{"0":{"m00":[0,1],"m01":[0]},"1":{"m10":[42]}}}', $json);
+    }
+
+    public function testExcludeIfIsIgnoredWithoutExpressionLanguage(): void
+    {
+        self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, ['serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel'], [''], options: ['expression_language' => true]);
+        self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel', ['expression_language' => true]);
+        $serializer = new Serializer('/tmp');
+
+        $json = $serializer->serialize(self::createExcludeIfModel(), 'json', new Context());
+        $expected = '{"name":"","serialize_only":"serialize","without_context_only":"without context","children":[],"child_map":{}}';
+        self::assertSame($expected, $json);
+
+        /** @var ExcludeIfModel $model */
+        $model = $serializer->deserialize($json, ExcludeIfModel::class, 'json', new Context());
+        self::assertSame('serialize', $model->serializeOnly);
+    }
+
+    public function testExcludeIf(): void
+    {
+        self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, ['serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel'], [''], options: ['expression_language' => true]);
+        self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel', ['expression_language' => true]);
+        $serializer = new Serializer('/tmp', expressionLanguage: new ExpressionLanguage());
+
+        $json = $serializer->serialize(self::createExcludeIfModel(), 'json');
+        $expected = '{"name":"","serialize_only":"serialize","without_context_only":"without context","children":[],"child_map":{}}';
+        self::assertSame($expected, $json);
+
+        $json = $serializer->serialize(self::createExcludeIfModel(), 'json', new Context());
+        $expected = '{"name":"","serialize_only":"serialize","children":[],"child_map":{}}';
+        self::assertSame($expected, $json);
+
+        /** @var ExcludeIfModel $model */
+        $model = $serializer->deserialize('{"serialize_only":"serialize","without_context_only":"without context"}', ExcludeIfModel::class, 'json', new Context());
+        self::assertNull($model->serializeOnly);
+        self::assertNull($model->withoutContextOnly);
+    }
+
+    private static function createExcludeIfModel(): ExcludeIfModel
+    {
+        $model = new ExcludeIfModel();
+        $model->serializeOnly = 'serialize';
+        $model->withoutContextOnly = 'without context';
+
+        return $model;
     }
 }

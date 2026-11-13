@@ -32,12 +32,15 @@ final readonly class SerializerGenerator
 
     private Filesystem $filesystem;
 
+    private ExclusionResolver $exclusionResolver;
+
     public function __construct(
         private Serialization $templating,
         private GeneratorConfiguration $configuration,
         private string $cacheDirectory,
     ) {
         $this->filesystem = new Filesystem();
+        $this->exclusionResolver = new ExclusionResolver($configuration->shouldEvaluateExpressions());
     }
 
     /**
@@ -107,7 +110,7 @@ final readonly class SerializerGenerator
         $arrayPath = Serialization::varJsonPath();
         $modelPath = Serialization::varModel();
         $code = $this->generateCodeForClass($classMetadata, $arrayPath, $modelPath);
-        $code = $this->templating->renderFunction($functionName, $className, $code);
+        $code = $this->templating->renderFunction($functionName, $className, $code, $this->exclusionResolver->isEnabled());
 
         $this->filesystem->dumpFile(\sprintf('%s/%s.php', $this->cacheDirectory, $functionName), $code);
     }
@@ -149,7 +152,7 @@ final readonly class SerializerGenerator
         }
         if ($this->configuration->shouldSerializeNull()) {
             foreach ($properties as $key => $property) {
-                if ($property->isSkipWhenEmpty()) {
+                if ($property->isSkipWhenEmpty() || null !== $this->exclusionResolver->excludeIf($property)) {
                     continue;
                 }
 
@@ -176,11 +179,32 @@ final readonly class SerializerGenerator
 
         $mightBeEmpty = !$this->configuration->shouldSerializeNull() || !$classMetadata->getProperties();
         $built = $this->templating->renderClass($nestedTarget, $code, initialValues: $initialValues, withEmptyObject: $mightBeEmpty);
-        if ($isRootLevel) {
-            return $built;
+        if (!$isRootLevel) {
+            $built .= $this->templating->renderAssign($target, "{$nestedTarget}");
         }
 
-        return $built.$this->templating->renderAssign($target, "{$nestedTarget}");
+        return $this->generateCodeForClassExclusion($classMetadata, $target, $modelPath, $built, $isRootLevel);
+    }
+
+    private function generateCodeForClassExclusion(
+        ClassMetadata $classMetadata,
+        ModelPath $target,
+        ModelPath $modelPath,
+        string $code,
+        bool $isRootLevel,
+    ): string {
+        $excludeIf = $this->exclusionResolver->excludeIf($classMetadata);
+        if (null === $excludeIf) {
+            return $code;
+        }
+
+        $excludedCode = match (true) {
+            $isRootLevel => $this->templating->renderAssign($target, '$emptyObjectAndHashmap'),
+            $this->configuration->shouldSerializeNull() => $this->templating->renderAssign($target, 'null'),
+            default => null,
+        };
+
+        return $this->templating->renderExcludeIfConditional($excludeIf, $modelPath, $code, $excludedCode);
     }
 
     /**
@@ -217,7 +241,25 @@ final readonly class SerializerGenerator
             return '';
         }
 
-        $modelPropertyPath = $modelPath.'->'.$propertyMetadata->getName();
+        $code = $this->generateCodeForFieldValue($propertyMetadata, $target, $modelPath, $stack, $depth);
+        $excludeIf = $this->exclusionResolver->excludeIf($propertyMetadata);
+        if (null === $excludeIf) {
+            return $code;
+        }
+
+        return $this->templating->renderExcludeIfConditional($excludeIf, $modelPath, $code);
+    }
+
+    /**
+     * @param array<string, positive-int> $stack
+     */
+    private function generateCodeForFieldValue(
+        PropertyMetadata $propertyMetadata,
+        ModelPath $target,
+        ModelPath $modelPath,
+        array $stack,
+        int $depth,
+    ): string {
         $fieldTarget = $target->withArrayLiteral($propertyMetadata->getSerializedName());
         $modelProperty = $modelPath->withPath($propertyMetadata->getName());
         $type = $propertyMetadata->getType();
@@ -444,6 +486,11 @@ final readonly class SerializerGenerator
         }
 
         $loop = $this->templating->renderLoopArray($listTarget, $modelPath, $index, $value, $innerCode);
+
+        // Excluded items leave gaps in the keys, and a list with gaps is encoded as a JSON object.
+        if (!$type->isHashmap() && !$this->configuration->shouldSerializeNull() && $this->exclusionResolver->typeMayBeExcluded($subType)) {
+            return $loop.$this->templating->renderAssign($target, "\\array_values({$listTarget})");
+        }
 
         return $loop.$this->renderLastArray($type, "{$target}", "{$listTarget}");
     }

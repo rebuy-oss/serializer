@@ -12,6 +12,7 @@ use Liip\Serializer\Exception\Exception;
 use Liip\Serializer\Exception\UnsupportedFormatException;
 use Liip\Serializer\Exception\UnsupportedTypeException;
 use Pnz\JsonException\Json;
+use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
@@ -36,6 +37,7 @@ final class Serializer implements SerializerInterface
     public function __construct(
         private readonly string $cacheDirectory,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
+        private readonly ?ExpressionLanguage $expressionLanguage = null,
     ) {
     }
 
@@ -136,7 +138,7 @@ final class Serializer implements SerializerInterface
         }
 
         try {
-            $object = $function($data);
+            $object = $function($data, $this->expressionLanguage, $context);
         } catch (\Throwable $t) {
             throw new Exception('Error during deserialization', 0, $t);
         }
@@ -195,7 +197,7 @@ final class Serializer implements SerializerInterface
         }
 
         try {
-            $array = $function($data, $useStdClass);
+            $array = $function($data, $useStdClass, $this->expressionLanguage, $context);
         } catch (\Throwable $t) {
             throw new Exception('Error during serialization', 0, $t);
         }

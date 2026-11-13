@@ -33,6 +33,8 @@ use Tests\Liip\Serializer\Fixtures\EnumModel;
 use Tests\Liip\Serializer\Fixtures\ExcludeIfConstructorModel;
 use Tests\Liip\Serializer\Fixtures\ExcludeIfDeserializationChild;
 use Tests\Liip\Serializer\Fixtures\ExcludeIfDeserializationModel;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfDiscriminator;
+use Tests\Liip\Serializer\Fixtures\ExcludeIfDiscriminatorModel;
 use Tests\Liip\Serializer\Fixtures\ExcludeIfModel;
 use Tests\Liip\Serializer\Fixtures\FloatProperty;
 use Tests\Liip\Serializer\Fixtures\Inheritance;
@@ -665,12 +667,6 @@ class DeserializerGeneratorTest extends SerializerTestCase
         self::assertNull($model->arguments?->child);
     }
 
-    public static function provideNullAsDefault(): iterable
-    {
-        yield 'null as default' => [true];
-        yield 'null not as default' => [false];
-    }
-
     public function testExcludeIfOnRootClass(): void
     {
         $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfDeserializationChild';
@@ -681,6 +677,58 @@ class DeserializerGeneratorTest extends SerializerTestCase
 
         $model = $functionName(['name' => 'child']);
         self::assertInstanceOf(ExcludeIfDeserializationChild::class, $model);
+    }
+
+    public function testExcludeIfOnDiscriminatorSubClassKeepsList(): void
+    {
+        $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfDiscriminatorModel';
+        self::generateDeserializer(self::$metadataBuilder, ExcludeIfDiscriminatorModel::class, $functionName, self::WITH_EXPRESSIONS);
+        $input = [
+            'items' => [
+                ['type' => 'hidden', 'name' => 'a'],
+                ['type' => 'visible', 'name' => 'b'],
+                ['type' => 'hidden', 'name' => 'c'],
+                ['type' => 'visible', 'name' => 'd'],
+            ],
+        ];
+
+        /** @var ExcludeIfDiscriminatorModel $model */
+        $model = $functionName($input, new ExpressionLanguage());
+        $names = array_map(static fn (ExcludeIfDiscriminator $item): string => $item->name, $model->items);
+
+        self::assertTrue(array_is_list($model->items));
+        self::assertSame(['b', 'd'], $names);
+    }
+
+    #[DataProvider('provideNullAsDefault')]
+    public function testExcludeIfOnDiscriminatorSubClassDoesNotReuseSetterValue(bool $nullAsDefault): void
+    {
+        $alias = ExcludeIfDiscriminatorModel::class.($nullAsDefault ? 'NullAsDefault' : 'NullNotAsDefault');
+        $functionName = DeserializerGenerator::buildDeserializerFunctionName($alias);
+        class_alias(ExcludeIfDiscriminatorModel::class, $alias);
+        self::generateDeserializer(self::$metadataBuilder, $alias, $functionName, [
+            'expression_language' => true,
+            'generation' => ['deserialization' => ['null_as_default' => $nullAsDefault]],
+        ]);
+        $input = [
+            'parents' => [
+                ['child' => ['type' => 'visible', 'name' => 'first']],
+                ['child' => ['type' => 'hidden', 'name' => 'second']],
+            ],
+        ];
+
+        /** @var ExcludeIfDiscriminatorModel $model */
+        $model = $functionName($input, new ExpressionLanguage());
+
+        self::assertCount(2, $model->parents);
+        self::assertSame('first', $model->parents[0]->getChild()?->name);
+        self::assertNull($model->parents[1]->getChild());
+    }
+
+    public static function provideNullAsDefault(): iterable
+    {
+        yield 'null as default' => [true];
+        yield 'null not as default' => [false];
     }
 
     /**

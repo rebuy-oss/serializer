@@ -279,19 +279,22 @@ final readonly class DeserializerGenerator
             $getValue = $this->generateInnerCodeForFieldType($propertyType, $arrayPath, $tempVariable, $stack);
             $setIntoModel = $this->templating->renderSetter((string) $modelPath, $propertyMetadata->getAccessor()->getSetterMethod(), (string) $tempVariable);
 
+            // An excluded class does not assign the temporary variable, and a value from an earlier loop iteration must not stay in it.
+            $mayBeExcluded = $this->exclusionResolver->typeMayBeExcluded($propertyType);
+            $unsetCode = $mayBeExcluded ? $this->templating->renderUnset([(string) $tempVariable]) : '';
+
             if ($this->configuration->shouldTreatNullAsDefault()) {
-                $code = $this->templating->renderConditional((string) $arrayPath, $getValue);
+                $code = $unsetCode.$this->templating->renderConditional((string) $arrayPath, $getValue);
                 $code .= $this->templating->renderConditional((string) $tempVariable, $setIntoModel);
 
                 return $code;
             }
 
-            // An excluded class does not assign the temporary variable.
-            if ($this->exclusionResolver->typeMayBeExcluded($propertyType)) {
+            if ($mayBeExcluded) {
                 $setIntoModel = $this->templating->renderIsNotNullConditional("({$tempVariable} ?? null)", $setIntoModel, null);
             }
 
-            return $this->templating->renderDynamicKeyExistsConditional((string) $arrayPathBase, (string) $arrayPathLastKey, "{$getValue}    {$setIntoModel}");
+            return $unsetCode.$this->templating->renderDynamicKeyExistsConditional((string) $arrayPathBase, (string) $arrayPathLastKey, "{$getValue}    {$setIntoModel}");
         }
 
         $modelPropertyPath = $modelPath->withPath($propertyMetadata->getName());
@@ -517,6 +520,11 @@ final readonly class DeserializerGenerator
 
         $code = $this->templating->renderInitArray((string) $modelPath);
         $code .= $this->templating->renderLoop((string) $arrayPath, (string) $index, (string) $value, $innerCode);
+
+        // Excluded items leave gaps in the keys of a list.
+        if (!$type->isHashmap() && $this->exclusionResolver->typeMayBeExcluded($subType)) {
+            $code .= $this->templating->renderAssignJsonDataToField((string) $modelPath, "\\array_values({$modelPath})")."\n";
+        }
 
         return $code;
     }

@@ -304,6 +304,11 @@ $serializer = new Serializer($cacheDirectory, $dispatcher);
 
 ## Expressions
 
+> [!IMPORTANT]
+> Expressions make (de-)serialization slower, because every expression is evaluated at runtime. Give the
+> `ExpressionLanguage` a cache that does not serialize its values, like `new ArrayAdapter(deepClone: false)`
+> (`storeSerialized` in older Symfony versions). The default cache is about 5 times slower.
+
 Like JMS Serializer, the rebuy Serializer supports expressions in the JMS attributes `#[Exclude(if: ...)]` and
 `#[Expose(if: ...)]` on properties and in `#[Exclude(if: ...)]` on classes. To use them, install the expression
 language with `composer require symfony/expression-language`.
@@ -334,6 +339,7 @@ In this example, we enable expressions for the generated files and pass an `Expr
 ```php
 use Liip\Serializer\Configuration\GeneratorConfiguration;
 use Liip\Serializer\Serializer;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 
 $configuration = GeneratorConfiguration::createFromArray([
@@ -343,7 +349,8 @@ $configuration = GeneratorConfiguration::createFromArray([
 
 // Generate the files as described above.
 
-$serializer = new Serializer($cacheDirectory, $dispatcher, new ExpressionLanguage());
+$expressionLanguage = new ExpressionLanguage(new ArrayAdapter(deepClone: false));
+$serializer = new Serializer($cacheDirectory, $dispatcher, $expressionLanguage);
 ```
 
 # Where do I go for help?

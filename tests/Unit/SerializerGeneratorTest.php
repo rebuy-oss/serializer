@@ -42,6 +42,7 @@ use Tests\Liip\Serializer\Fixtures\ModelWithAnnotations;
 use Tests\Liip\Serializer\Fixtures\ModelWithCustomType;
 use Tests\Liip\Serializer\Fixtures\MultidimensionalArrayForPrimitive;
 use Tests\Liip\Serializer\Fixtures\Nested;
+use Tests\Liip\Serializer\Fixtures\OptionalKeysModel;
 use Tests\Liip\Serializer\Fixtures\PostDeserialize;
 use Tests\Liip\Serializer\Fixtures\PrimitiveClassUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrimitiveUnionTyping;
@@ -447,6 +448,22 @@ class SerializerGeneratorTest extends SerializerTestCase
 
         self::assertSame($expected, $functionName($model, false));
         self::assertSame(['name' => null], $functionName(new InlineModel(), false));
+    }
+
+    public function testSerializeNullWithOnlyOptionalKeysGivesEmptyObject(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_OptionalKeysModel';
+        self::generateSerializers(self::$metadataBuilder, OptionalKeysModel::class, [$functionName], [''], options: [
+            ...self::WITH_EXPRESSIONS,
+            'generation' => [
+                'serialization' => ['serialize_null' => true],
+            ],
+        ]);
+
+        $model = new OptionalKeysModel();
+        $model->child = new OptionalKeysModel();
+
+        self::assertEquals(['child' => new \stdClass()], $functionName($model, true, new ExpressionLanguage()));
     }
 
     public function testSkipWhenEmptyWithRecursion(): void

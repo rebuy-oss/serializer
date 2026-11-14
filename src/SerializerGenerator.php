@@ -152,7 +152,7 @@ final readonly class SerializerGenerator
         }
         if ($this->configuration->shouldSerializeNull()) {
             foreach ($properties as $key => $property) {
-                if ($property->isSkipWhenEmpty() || $property->isInline() || null !== $this->exclusionResolver->excludeIf($property)) {
+                if ($this->mightOmitKey($property, $stack)) {
                     continue;
                 }
 
@@ -177,7 +177,7 @@ final readonly class SerializerGenerator
             $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack, $depth);
         }
 
-        $built = $this->templating->renderClass($nestedTarget, $code, initialValues: $initialValues, withEmptyObject: $this->mightBeEmpty($classMetadata));
+        $built = $this->templating->renderClass($nestedTarget, $code, initialValues: $initialValues, withEmptyObject: $this->mightBeEmpty($classMetadata, $stack));
         if (!$isRootLevel) {
             $built .= $this->templating->renderAssign($target, "{$nestedTarget}");
         }
@@ -185,13 +185,27 @@ final readonly class SerializerGenerator
         return $this->generateCodeForClassExclusion($classMetadata, $target, $modelPath, $built, $isRootLevel);
     }
 
-    private function mightBeEmpty(ClassMetadata $classMetadata): bool
+    /**
+     * @param array<string, positive-int> $stack
+     */
+    private function mightBeEmpty(ClassMetadata $classMetadata, array $stack): bool
     {
         if (!$this->configuration->shouldSerializeNull()) {
             return true;
         }
 
-        return array_all($classMetadata->getProperties(), static fn (PropertyMetadata $property): bool => $property->isInline());
+        return array_all($classMetadata->getProperties(), fn (PropertyMetadata $property): bool => $this->mightOmitKey($property, $stack));
+    }
+
+    /**
+     * @param array<string, positive-int> $stack
+     */
+    private function mightOmitKey(PropertyMetadata $property, array $stack): bool
+    {
+        return $property->isInline()
+            || $property->isSkipWhenEmpty()
+            || null !== $this->exclusionResolver->excludeIf($property)
+            || Recursion::hasMaxDepthReached($property, $stack);
     }
 
     private function generateCodeForClassExclusion(

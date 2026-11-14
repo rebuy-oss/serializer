@@ -63,10 +63,10 @@ final readonly class SerializerGenerator
     {
         $this->filesystem->mkdir($this->cacheDirectory);
 
-        foreach ($this->configuration as $classToGenerate) {
-            foreach ($classToGenerate as $groupCombination) {
+        foreach ($this->configuration->getSerializerClasses() as $classToGenerate) {
+            foreach ($classToGenerate->getGroupCombinations() as $groupCombination) {
                 $className = $classToGenerate->getClassName();
-                foreach ($groupCombination->getVersions() as $version) {
+                foreach ($classToGenerate->getVersions($groupCombination) as $version) {
                     $groups = $groupCombination->getGroups();
                     if ('' === $version) {
                         if ([] === $groups) {

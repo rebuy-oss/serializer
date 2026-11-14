@@ -16,7 +16,6 @@ use Liip\MetadataParser\Metadata\PropertyTypePrimitive;
 use Liip\MetadataParser\Metadata\PropertyTypeUnion;
 use Liip\MetadataParser\Metadata\PropertyTypeUnknown;
 use Liip\MetadataParser\Reducer\TakeBestReducer;
-use Liip\Serializer\Configuration\ClassToGenerate;
 use Liip\Serializer\Configuration\GeneratorConfiguration;
 use Liip\Serializer\Path\ArrayEntry;
 use Liip\Serializer\Path\ArrayPath;
@@ -30,21 +29,14 @@ final readonly class DeserializerGenerator
 
     private Filesystem $filesystem;
 
-    private GeneratorConfiguration $configuration;
-
     private ExclusionResolver $exclusionResolver;
 
-    /**
-     * @param list<class-string> $classesToGenerate This is a list of FQCN classnames
-     */
     public function __construct(
         private Deserialization $templating,
-        array $classesToGenerate,
+        private GeneratorConfiguration $configuration,
         private string $cacheDirectory,
-        ?GeneratorConfiguration $configuration = null,
     ) {
         $this->filesystem = new Filesystem();
-        $this->configuration = $this->createGeneratorConfiguration($configuration, $classesToGenerate);
         $this->exclusionResolver = new ExclusionResolver($this->configuration->shouldEvaluateExpressions());
     }
 
@@ -57,11 +49,10 @@ final readonly class DeserializerGenerator
     {
         $this->filesystem->mkdir($this->cacheDirectory);
 
-        /** @var ClassToGenerate $classToGenerate */
-        foreach ($this->configuration as $classToGenerate) {
+        foreach ($this->configuration->getDeserializerClasses() as $className) {
             // we do not use the oldest version reducer here and hope for the best
             // otherwise we end up with generated property names for accessor methods
-            $classMetadata = $metadataBuilder->build($classToGenerate->getClassName(), [
+            $classMetadata = $metadataBuilder->build($className, [
                 new TakeBestReducer(),
             ]);
             $this->writeFile($classMetadata);
@@ -563,21 +554,5 @@ final readonly class DeserializerGenerator
         }
 
         return $this->templating->renderAssignUnitEnum($enumClass, (string) $modelPath, (string) $arrayPath, $nullCheck);
-    }
-
-    /**
-     * @param list<class-string> $classesToGenerate
-     */
-    private function createGeneratorConfiguration(
-        ?GeneratorConfiguration $configuration,
-        array $classesToGenerate,
-    ): GeneratorConfiguration {
-        $configuration ??= new GeneratorConfiguration([], []);
-
-        foreach ($classesToGenerate as $className) {
-            $configuration->addClassToGenerate(new ClassToGenerate($configuration, $className));
-        }
-
-        return $configuration;
     }
 }

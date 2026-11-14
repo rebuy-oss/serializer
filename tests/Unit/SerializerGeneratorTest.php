@@ -54,7 +54,7 @@ use Tests\Liip\Serializer\Fixtures\VirtualProperties;
 #[Medium]
 class SerializerGeneratorTest extends SerializerTestCase
 {
-    private const array WITH_EXPRESSIONS = ['expression_language' => true];
+    private const array WITH_EXPRESSIONS = ['expressionLanguage' => true];
 
     private static Builder $metadataBuilder;
 
@@ -229,7 +229,7 @@ class SerializerGeneratorTest extends SerializerTestCase
     public function testArraysWithUnknownSubType(): void
     {
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_UnknownArraySubType';
-        self::generateSerializers(self::$metadataBuilder, UnknownArraySubType::class, [$functionName], [''], [], ['allow_generic_arrays' => true]);
+        self::generateSerializers(self::$metadataBuilder, UnknownArraySubType::class, [$functionName], [''], [], ['allowGenericArrays' => true]);
 
         $list = new UnknownArraySubType();
         $unknownSubtype = ['unknown' => 'type', 'nested' => ['unknown' => 'subtype']];
@@ -338,11 +338,7 @@ class SerializerGeneratorTest extends SerializerTestCase
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_SkipWhenEmptyModelWithNull';
         $alias = SkipWhenEmptyModel::class.'WithNull';
         class_alias(SkipWhenEmptyModel::class, $alias);
-        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
-            'generation' => [
-                'serialization' => ['serialize_null' => true],
-            ],
-        ]);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: ['serializeNull' => true]);
 
         $data = $functionName(new SkipWhenEmptyModel(), false);
 
@@ -424,11 +420,7 @@ class SerializerGeneratorTest extends SerializerTestCase
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ModelWithNull';
         $alias = Model::class.'WithNull';
         class_alias(Model::class, $alias);
-        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
-            'generation' => [
-                'serialization' => ['serialize_null' => true],
-            ],
-        ]);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: ['serializeNull' => true]);
 
         $model = new Model();
         $data = $functionName($model, false);
@@ -445,11 +437,7 @@ class SerializerGeneratorTest extends SerializerTestCase
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ModelPopulatedWithNull';
         $alias = Model::class.'PopulatedWithNull';
         class_alias(Model::class, $alias);
-        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
-            'generation' => [
-                'serialization' => ['serialize_null' => true],
-            ],
-        ]);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: ['serializeNull' => true]);
 
         $model = new Model();
         $model->unAnnotated = 'plain';
@@ -661,7 +649,7 @@ class SerializerGeneratorTest extends SerializerTestCase
     public function testPrimitiveUnionDiscriminator(mixed $propertyValue): void
     {
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_PrimitiveUnionTyping';
-        self::generateSerializers(self::$metadataBuilder, PrimitiveUnionTyping::class, [$functionName], [''], [], ['allow_generic_arrays' => true]);
+        self::generateSerializers(self::$metadataBuilder, PrimitiveUnionTyping::class, [$functionName], [''], [], ['allowGenericArrays' => true]);
 
         $model = new PrimitiveUnionTyping();
         $model->property = $propertyValue;
@@ -686,7 +674,7 @@ class SerializerGeneratorTest extends SerializerTestCase
     public function testPrimitiveClassUnion(): void
     {
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_PrimitiveClassUnionTyping';
-        self::generateSerializers(self::$metadataBuilder, PrimitiveClassUnionTyping::class, [$functionName], [''], [], ['allow_generic_arrays' => true]);
+        self::generateSerializers(self::$metadataBuilder, PrimitiveClassUnionTyping::class, [$functionName], [''], [], ['allowGenericArrays' => true]);
 
         $model = new PrimitiveClassUnionTyping();
         $model->classUnion = new VirtualProperties();
@@ -959,10 +947,8 @@ class SerializerGeneratorTest extends SerializerTestCase
         $alias = ExcludeIfModel::class.'WithNull';
         class_alias(ExcludeIfModel::class, $alias);
         self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
-            'expression_language' => true,
-            'generation' => [
-                'serialization' => ['serialize_null' => true],
-            ],
+            'expressionLanguage' => true,
+            'serializeNull' => true,
         ]);
 
         $data = $functionName(self::createExcludeIfModel(), false, new ExpressionLanguage());

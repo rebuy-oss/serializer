@@ -12,7 +12,9 @@ use Liip\MetadataParser\ModelParser\PhpDocParser;
 use Liip\MetadataParser\ModelParser\ReflectionParser;
 use Liip\MetadataParser\Parser;
 use Liip\MetadataParser\RecursionChecker;
+use Liip\Serializer\Configuration\ClassToGenerate;
 use Liip\Serializer\Configuration\GeneratorConfiguration;
+use Liip\Serializer\Configuration\GroupCombination;
 use Liip\Serializer\DeserializerGenerator;
 use Liip\Serializer\Serializer;
 use Liip\Serializer\SerializerGenerator;
@@ -48,18 +50,18 @@ final class BenchmarkFactory
             new RecursionChecker(null, []),
         );
 
-        $configuration = GeneratorConfiguration::createFromArray([
-            'default_group_combinations' => [[]],
-            'default_versions' => [''],
-            'classes' => [
-                ListModel::class => [],
-                ExcludeIfModel::class => [],
+        $groupCombinations = [new GroupCombination([])];
+        $configuration = new GeneratorConfiguration(
+            serializerClasses: [
+                new ClassToGenerate(ListModel::class, [''], $groupCombinations),
+                new ClassToGenerate(ExcludeIfModel::class, [''], $groupCombinations),
             ],
-            'options' => ['expression_language' => true],
-        ]);
+            deserializerClasses: [ListModel::class, ExcludeIfModel::class],
+            expressionLanguage: true,
+        );
 
         new SerializerGenerator(new Serialization(), $configuration, $cacheDir)->generate($builder);
-        new DeserializerGenerator(new Deserialization(), [], $cacheDir, $configuration)->generate($builder);
+        new DeserializerGenerator(new Deserialization(), $configuration, $cacheDir)->generate($builder);
     }
 
     public static function createSerializer(): Serializer

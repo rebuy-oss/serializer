@@ -4,69 +4,41 @@ declare(strict_types=1);
 
 namespace Liip\Serializer\Configuration;
 
-/**
- * @implements \IteratorAggregate<int, GroupCombination>
- */
-class ClassToGenerate implements \IteratorAggregate
+final readonly class ClassToGenerate
 {
     /**
-     * A list of group combinations, potentially with a version overwrite.
-     *
-     * @see GroupCombination::$groups
-     *
-     * @var GroupCombination[]
-     */
-    private array $groupCombinations = [];
-
-    /**
-     * Overwrite global default list of versions to generate.
-     *
-     * @see GroupCombination::$versions
-     *
-     * @var list<string>|null
-     */
-    private readonly ?array $defaultVersions;
-
-    /**
-     * @param class-string          $className
-     * @param list<string|int>|null $defaultVersions
+     * @param class-string           $className
+     * @param list<string>           $versions
+     * @param list<GroupCombination> $groupCombinations
      */
     public function __construct(
-        private readonly GeneratorConfiguration $configuration,
-        private readonly string $className,
-        ?array $defaultVersions = null,
+        private string $className,
+        private array $versions,
+        private array $groupCombinations,
     ) {
-        $this->defaultVersions = null === $defaultVersions ? null : array_map(strval(...), $defaultVersions);
     }
 
+    /**
+     * @return class-string
+     */
     public function getClassName(): string
     {
         return $this->className;
     }
 
     /**
+     * @return list<GroupCombination>
+     */
+    public function getGroupCombinations(): array
+    {
+        return $this->groupCombinations;
+    }
+
+    /**
      * @return list<string>
      */
-    public function getDefaultVersions(): array
+    public function getVersions(GroupCombination $groupCombination): array
     {
-        if (null !== $this->defaultVersions) {
-            return $this->defaultVersions;
-        }
-
-        return $this->configuration->getDefaultVersions();
-    }
-
-    public function addGroupCombination(GroupCombination $groupCombination): void
-    {
-        $this->groupCombinations[] = $groupCombination;
-    }
-
-    public function getIterator(): \Traversable
-    {
-        if ($this->groupCombinations) {
-            return new \ArrayIterator($this->groupCombinations);
-        }
-
-        return new \ArrayIterator($this->configuration->getDefaultGroupCombinations($this));
+        return $groupCombination->getVersions() ?? $this->versions;
     }
 }

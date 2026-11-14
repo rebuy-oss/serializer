@@ -8,9 +8,13 @@ use Liip\MetadataParser\Builder;
 use Liip\MetadataParser\ModelParser\ModelParserInterface;
 use Liip\MetadataParser\Parser;
 use Liip\MetadataParser\RecursionChecker;
+use Liip\Serializer\Configuration\ClassToGenerate;
 use Liip\Serializer\Configuration\GeneratorConfiguration;
+use Liip\Serializer\Configuration\GroupCombination;
 use Liip\Serializer\DeserializerGenerator;
+use Liip\Serializer\DeserializerHandlerInterface;
 use Liip\Serializer\SerializerGenerator;
+use Liip\Serializer\SerializerHandlerInterface;
 use Liip\Serializer\Template\Deserialization;
 use Liip\Serializer\Template\Serialization;
 use PHPUnit\Framework\TestCase;
@@ -28,12 +32,14 @@ class SerializerTestCase extends TestCase
 
     /**
      * Generate the deserializer for the specified class and make sure the file and function exist.
+     *
+     * @param array{allowGenericArrays?: bool, expressionLanguage?: bool, handlers?: list<SerializerHandlerInterface|DeserializerHandlerInterface>, serializeNull?: bool, nullAsDefault?: bool} $options
      */
     protected static function generateDeserializer(Builder $metadataBuilder, string $classToGenerate, string $functionName, array $options = []): void
     {
         $templating = new Deserialization();
-        $configuration = GeneratorConfiguration::createFromArray(['classes' => [$classToGenerate => []], 'options' => $options]);
-        $deserializerGenerator = new DeserializerGenerator($templating, [], static::getGeneratedDir(), $configuration);
+        $configuration = new GeneratorConfiguration(...$options, deserializerClasses: [new ClassToGenerate($classToGenerate, [''], [new GroupCombination([])])]);
+        $deserializerGenerator = new DeserializerGenerator($templating, $configuration, static::getGeneratedDir());
 
         $deserializerGenerator->generate($metadataBuilder);
 
@@ -43,17 +49,20 @@ class SerializerTestCase extends TestCase
         self::assertTrue(\function_exists($functionName));
     }
 
-    protected static function generateSerializers(Builder $metadataBuilder, string $classToGenerate, array $functionNames, array $versions = ['2'], array $groups = [], array $options = []): void
+    /**
+     * @param list<string>                                                                                                                                                                      $functionNames
+     * @param list<string>                                                                                                                                                                      $versions
+     * @param list<list<string>>                                                                                                                                                                $groups
+     * @param array{allowGenericArrays?: bool, expressionLanguage?: bool, handlers?: list<SerializerHandlerInterface|DeserializerHandlerInterface>, serializeNull?: bool, nullAsDefault?: bool} $options
+     */
+    protected static function generateSerializers(Builder $metadataBuilder, string $classToGenerate, array $functionNames, array $versions = ['2'], array $groups = [[]], array $options = []): void
     {
         $templating = new Serialization();
-        $configuration = GeneratorConfiguration::createFromArray([
-            'default_group_combinations' => $groups,
-            'default_versions' => $versions,
-            'classes' => [
-                $classToGenerate => [],
-            ],
-            'options' => $options,
-        ]);
+        $groupCombinations = array_map(static fn (array $combination): GroupCombination => new GroupCombination($combination), $groups);
+        $configuration = new GeneratorConfiguration(
+            ...$options,
+            serializerClasses: [new ClassToGenerate($classToGenerate, $versions, $groupCombinations)],
+        );
         $serializerGenerator = new SerializerGenerator($templating, $configuration, static::getGeneratedDir());
 
         $serializerGenerator->generate($metadataBuilder);

@@ -152,7 +152,7 @@ final readonly class SerializerGenerator
         }
         if ($this->configuration->shouldSerializeNull()) {
             foreach ($properties as $key => $property) {
-                if ($property->isSkipWhenEmpty() || null !== $this->exclusionResolver->excludeIf($property)) {
+                if ($property->isSkipWhenEmpty() || $property->isInline() || null !== $this->exclusionResolver->excludeIf($property)) {
                     continue;
                 }
 
@@ -177,13 +177,21 @@ final readonly class SerializerGenerator
             $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack, $depth);
         }
 
-        $mightBeEmpty = !$this->configuration->shouldSerializeNull() || !$classMetadata->getProperties();
-        $built = $this->templating->renderClass($nestedTarget, $code, initialValues: $initialValues, withEmptyObject: $mightBeEmpty);
+        $built = $this->templating->renderClass($nestedTarget, $code, initialValues: $initialValues, withEmptyObject: $this->mightBeEmpty($classMetadata));
         if (!$isRootLevel) {
             $built .= $this->templating->renderAssign($target, "{$nestedTarget}");
         }
 
         return $this->generateCodeForClassExclusion($classMetadata, $target, $modelPath, $built, $isRootLevel);
+    }
+
+    private function mightBeEmpty(ClassMetadata $classMetadata): bool
+    {
+        if (!$this->configuration->shouldSerializeNull()) {
+            return true;
+        }
+
+        return array_all($classMetadata->getProperties(), static fn (PropertyMetadata $property): bool => $property->isInline());
     }
 
     private function generateCodeForClassExclusion(
@@ -241,7 +249,15 @@ final readonly class SerializerGenerator
             return '';
         }
 
-        $code = $this->generateCodeForFieldValue($propertyMetadata, $target, $modelPath, $stack, $depth);
+        if ($propertyMetadata->isInline()) {
+            $inlineVariable = ModelPath::tempVariable([(string) $modelPath, 'inline', $propertyMetadata->getName()]);
+            $code = $this->generateCodeForFieldValue($propertyMetadata, $inlineVariable, $modelPath, $stack, $depth);
+            $code = $this->templating->renderInline($target, $inlineVariable, $code);
+        } else {
+            $fieldTarget = $target->withArrayLiteral($propertyMetadata->getSerializedName());
+            $code = $this->generateCodeForFieldValue($propertyMetadata, $fieldTarget, $modelPath, $stack, $depth);
+        }
+
         $excludeIf = $this->exclusionResolver->excludeIf($propertyMetadata);
         if (null === $excludeIf) {
             return $code;
@@ -255,12 +271,11 @@ final readonly class SerializerGenerator
      */
     private function generateCodeForFieldValue(
         PropertyMetadata $propertyMetadata,
-        ModelPath $target,
+        ModelPath $fieldTarget,
         ModelPath $modelPath,
         array $stack,
         int $depth,
     ): string {
-        $fieldTarget = $target->withArrayLiteral($propertyMetadata->getSerializedName());
         $modelProperty = $modelPath->withPath($propertyMetadata->getName());
         $type = $propertyMetadata->getType();
         $requiresExplicitNullSet = $this->fieldTypeRequiresExplicitNullSet($type);

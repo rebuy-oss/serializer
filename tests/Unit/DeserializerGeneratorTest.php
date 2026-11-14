@@ -38,6 +38,7 @@ use Tests\Liip\Serializer\Fixtures\ExcludeIfDiscriminatorModel;
 use Tests\Liip\Serializer\Fixtures\ExcludeIfModel;
 use Tests\Liip\Serializer\Fixtures\FloatProperty;
 use Tests\Liip\Serializer\Fixtures\Inheritance;
+use Tests\Liip\Serializer\Fixtures\InlineModel;
 use Tests\Liip\Serializer\Fixtures\ListModel;
 use Tests\Liip\Serializer\Fixtures\Model;
 use Tests\Liip\Serializer\Fixtures\ModelWithAnnotations;
@@ -129,6 +130,31 @@ class DeserializerGeneratorTest extends SerializerTestCase
         self::assertInstanceOf(\DateTimeImmutable::class, $model->dateImmutable);
         self::assertSame('2016-06-01', $model->dateImmutable->format('Y-m-d'));
         self::assertSame('2016-06-01', $model->getDateImmutablePrivate()?->format('Y-m-d'));
+    }
+
+    #[DataProvider('provideNullAsDefault')]
+    public function testInline(bool $nullAsDefault): void
+    {
+        $alias = InlineModel::class.($nullAsDefault ? 'NullAsDefault' : 'NullNotAsDefault');
+        $functionName = DeserializerGenerator::buildDeserializerFunctionName($alias);
+        class_alias(InlineModel::class, $alias);
+        self::generateDeserializer(self::$metadataBuilder, $alias, $functionName, [
+            'generation' => ['deserialization' => ['null_as_default' => $nullAsDefault]],
+        ]);
+
+        $input = [
+            'name' => 'root',
+            'nested_string' => 'nested',
+            'array' => ['a'],
+        ];
+
+        /** @var InlineModel $model */
+        $model = $functionName($input);
+        self::assertSame('root', $model->name);
+        self::assertInstanceOf(Nested::class, $model->nested);
+        self::assertSame('nested', $model->nested->nestedString);
+        self::assertSame(['a'], $model->nested->array);
+        self::assertSame(['name' => 'root', 'nested_string' => 'nested', 'array' => ['a']], $model->getExtra());
     }
 
     public function testLists(): void

@@ -18,6 +18,8 @@
 * Support JMS `Exclude(if: ...)` and `Expose(if: ...)` expressions for serialization and deserialization.
   Enable the `expression_language` generator option and pass a Symfony `ExpressionLanguage` to the `Serializer`
   constructor to evaluate them. Without the option, the expressions are ignored.
+* Support JMS `Inline` for serialization and deserialization. Like in JMS, serialization merges the keys of an inline
+  object or array into the parent, and deserialization passes the data of the parent to the inline property.
 
 # 3.x
 

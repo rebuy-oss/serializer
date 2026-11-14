@@ -94,6 +94,17 @@ if (\is_array({{propertyAccessor}})) {
 }
 EOT;
 
+    private const string TMPL_INLINE = <<<'EOT'
+{{variable}} = null;
+{{code}}
+if (\is_array({{variable}}) || {{variable}} instanceof \ArrayObject) {
+    foreach ({{variable}} as $inlineKey => $inlineValue) {
+        {{target}}[$inlineKey] = $inlineValue;
+    }
+}
+
+EOT;
+
     private const string TMPL_ASSIGN = <<<'EOT'
 {{target}} = {{propertyAccessor}};
 EOT;
@@ -216,6 +227,15 @@ EOT;
     {
         return $this->render(self::TMPL_ARRAY_CONDITIONAL, [
             'propertyAccessor' => $propertyAccessor,
+            'code' => $code,
+        ]);
+    }
+
+    public function renderInline(string|ModelPath $target, string|ModelPath $variable, string $code): string
+    {
+        return $this->render(self::TMPL_INLINE, [
+            'target' => $target,
+            'variable' => $variable,
             'code' => $code,
         ]);
     }

@@ -32,6 +32,8 @@ use Tests\Liip\Serializer\Fixtures\ExcludeIfChild;
 use Tests\Liip\Serializer\Fixtures\ExcludeIfModel;
 use Tests\Liip\Serializer\Fixtures\InaccessiblePrivateProperty;
 use Tests\Liip\Serializer\Fixtures\Inheritance;
+use Tests\Liip\Serializer\Fixtures\InlineModel;
+use Tests\Liip\Serializer\Fixtures\InlineModelWithGenericArray;
 use Tests\Liip\Serializer\Fixtures\ListModel;
 use Tests\Liip\Serializer\Fixtures\ListOfListModel;
 use Tests\Liip\Serializer\Fixtures\ListOfModel;
@@ -370,6 +372,81 @@ class SerializerGeneratorTest extends SerializerTestCase
         ];
 
         self::assertSame($expected, $functionName($model, false));
+    }
+
+    public function testInline(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_InlineModel';
+        self::generateSerializers(self::$metadataBuilder, InlineModel::class, [$functionName], ['']);
+
+        $model = new InlineModel();
+        $model->name = 'root';
+        $model->nested = new Nested('nested');
+        $model->nested->array = ['a'];
+        $model->setExtra(['extra_key' => 'extra']);
+
+        $expected = [
+            'name' => 'root',
+            'array' => ['a'],
+            'nested_string' => 'nested',
+            'extra_key' => 'extra',
+        ];
+
+        self::assertSame($expected, $functionName($model, false));
+    }
+
+    public function testInlineWithMixedKeys(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_InlineModelWithGenericArray';
+        self::generateSerializers(self::$metadataBuilder, InlineModelWithGenericArray::class, [$functionName], [''], options: ['allow_generic_arrays' => true]);
+
+        $model = new InlineModelWithGenericArray();
+        $model->name = 'root';
+        $model->nested = new Nested('nested');
+        $model->nested->array = ['a'];
+        $model->genericArray = ['foo', 'bar' => 'test'];
+
+        $expected = [
+            'name' => 'root',
+            'array' => ['a'],
+            'nested_string' => 'nested',
+            '0' => 'foo',
+            'bar' => 'test',
+        ];
+
+        self::assertSame($expected, $functionName($model, false));
+    }
+
+    public function testInlineWithEmptyValues(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_InlineModel';
+        self::generateSerializers(self::$metadataBuilder, InlineModel::class, [$functionName], ['']);
+
+        self::assertSame([], $functionName(new InlineModel(), false));
+    }
+
+    public function testInlineWithSerializeNull(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_InlineModelWithNull';
+        $alias = InlineModel::class.'WithNull';
+        class_alias(InlineModel::class, $alias);
+        self::generateSerializers(self::$metadataBuilder, $alias, [$functionName], [''], options: [
+            'generation' => [
+                'serialization' => ['serialize_null' => true],
+            ],
+        ]);
+
+        $model = new InlineModel();
+        $model->nested = new Nested('nested');
+
+        $expected = [
+            'name' => null,
+            'nested_string' => 'nested',
+            'array' => null,
+        ];
+
+        self::assertSame($expected, $functionName($model, false));
+        self::assertSame(['name' => null], $functionName(new InlineModel(), false));
     }
 
     public function testSkipWhenEmptyWithRecursion(): void

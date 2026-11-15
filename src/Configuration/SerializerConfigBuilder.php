@@ -13,37 +13,27 @@ use Liip\Serializer\SerializerGenerator;
 use Liip\Serializer\SerializerHandlerInterface;
 use Liip\Serializer\Template\Deserialization;
 use Liip\Serializer\Template\Serialization;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 final class SerializerConfigBuilder
 {
     private ?Builder $metadataBuilder = null;
 
     /**
-     * @var list<array{className: class-string, versions: list<string|int>|null, groupCombinations: list<GroupCombination>|null}>
+     * @var array<class-string, array{versions: list<string|int>|null, groupCombinations: list<GroupCombination>|null, target: GenerationTarget}>
      */
-    private array $serializerClasses = [];
+    private array $classEntries = [];
 
     /**
      * @var list<class-string>
      */
-    private array $deserializerClasses = [];
+    private array $plainSerializerClasses = [];
 
     /**
-     * @var list<array{namespace: string, directory: string, versions: list<string|int>|null, groupCombinations: list<GroupCombination>|null}>
+     * @var list<class-string>
      */
-    private array $serializerPaths = []; // @phpstan-ignore property.onlyWritten
-
-    /**
-     * @var list<array{namespace: string, directory: string}>
-     */
-    private array $deserializerPaths = []; // @phpstan-ignore property.onlyWritten
-
-    /**
-     * @var list<string>
-     */
-    private array $skip = [];
+    private array $plainDeserializerClasses = [];
 
     /**
      * @var list<string|int>
@@ -86,9 +76,9 @@ final class SerializerConfigBuilder
      */
     public function withClasses(array $classNames): static
     {
-        foreach ($classNames as $className) {
-            $this->withClass($className);
-        }
+        $classNames = self::normalizeClassNames($classNames);
+        $this->plainSerializerClasses = [...$this->plainSerializerClasses, ...$classNames];
+        $this->plainDeserializerClasses = [...$this->plainDeserializerClasses, ...$classNames];
 
         return $this;
     }
@@ -98,9 +88,7 @@ final class SerializerConfigBuilder
      */
     public function withSerializerClasses(array $classNames): static
     {
-        foreach ($classNames as $className) {
-            $this->withClass($className, target: GenerationTarget::Serializer);
-        }
+        $this->plainSerializerClasses = [...$this->plainSerializerClasses, ...self::normalizeClassNames($classNames)];
 
         return $this;
     }
@@ -110,9 +98,7 @@ final class SerializerConfigBuilder
      */
     public function withDeserializerClasses(array $classNames): static
     {
-        foreach ($classNames as $className) {
-            $this->withClass($className, target: GenerationTarget::Deserializer);
-        }
+        $this->plainDeserializerClasses = [...$this->plainDeserializerClasses, ...self::normalizeClassNames($classNames)];
 
         return $this;
     }
@@ -124,51 +110,9 @@ final class SerializerConfigBuilder
      */
     public function withClass(string $className, ?array $versions = null, ?array $groupCombinations = null, GenerationTarget $target = GenerationTarget::Both): static
     {
-        if ($target->includesSerializer()) {
-            $this->serializerClasses[] = ['className' => $className, 'versions' => $versions, 'groupCombinations' => $groupCombinations];
-        }
-        if ($target->includesDeserializer()) {
-            $this->deserializerClasses[] = $className;
-        }
-
-        return $this;
-    }
-
-    /**
-     * @param list<string|int>|null       $versions
-     * @param list<GroupCombination>|null $groupCombinations
-     */
-    public function withPath(string $namespace, string $directory, ?array $versions = null, ?array $groupCombinations = null): static
-    {
-        $this->withSerializerPath($namespace, $directory, $versions, $groupCombinations);
-
-        return $this->withDeserializerPath($namespace, $directory);
-    }
-
-    /**
-     * @param list<string|int>|null       $versions
-     * @param list<GroupCombination>|null $groupCombinations
-     */
-    public function withSerializerPath(string $namespace, string $directory, ?array $versions = null, ?array $groupCombinations = null): static
-    {
-        $this->serializerPaths[] = ['namespace' => $namespace, 'directory' => $directory, 'versions' => $versions, 'groupCombinations' => $groupCombinations];
-
-        return $this;
-    }
-
-    public function withDeserializerPath(string $namespace, string $directory): static
-    {
-        $this->deserializerPaths[] = ['namespace' => $namespace, 'directory' => $directory];
-
-        return $this;
-    }
-
-    /**
-     * @param list<string> $skip
-     */
-    public function withSkip(array $skip): static
-    {
-        $this->skip = [...$this->skip, ...$skip];
+        self::assertVersions($versions);
+        self::assertGroupCombinations($groupCombinations);
+        $this->classEntries[ltrim($className, '\\')] = ['versions' => $versions, 'groupCombinations' => $groupCombinations, 'target' => $target];
 
         return $this;
     }
@@ -178,6 +122,7 @@ final class SerializerConfigBuilder
      */
     public function withDefaultVersions(array $versions): static
     {
+        self::assertVersions($versions);
         $this->defaultVersions = $versions;
 
         return $this;
@@ -188,6 +133,10 @@ final class SerializerConfigBuilder
      */
     public function withDefaultGroupCombinations(array $groupCombinations): static
     {
+        if ([] === $groupCombinations) {
+            throw new \InvalidArgumentException('Group combination list may not be empty. To generate without groups, specify a list with an empty list: [[]].');
+        }
+
         $this->defaultGroupCombinations = $groupCombinations;
 
         return $this;
@@ -249,14 +198,15 @@ final class SerializerConfigBuilder
             throw new \LogicException('Call withMetadataBuilder() before buildCompiler().');
         }
 
-        $serializerClasses = array_map($this->resolveClass(...), $this->serializerClasses);
-        if ([] === $serializerClasses && [] === $this->deserializerClasses) {
-            throw new \LogicException('No classes to generate. Add classes or paths.');
+        $serializerClasses = $this->resolveSerializerClasses();
+        $deserializerClasses = $this->resolveDeserializerClasses();
+        if ([] === $serializerClasses && [] === $deserializerClasses) {
+            throw new \LogicException('No classes to generate. Add classes.');
         }
 
         $configuration = new GeneratorConfiguration(
             $serializerClasses,
-            $this->deserializerClasses,
+            $deserializerClasses,
             $this->allowGenericArrays,
             null !== $this->expressionLanguage,
             $this->handlers,
@@ -272,17 +222,94 @@ final class SerializerConfigBuilder
     }
 
     /**
-     * @param array{className: class-string, versions: list<string|int>|null, groupCombinations: list<GroupCombination>|null} $entry
+     * @return list<ClassToGenerate>
      */
-    private function resolveClass(array $entry): ClassToGenerate
+    private function resolveSerializerClasses(): array
     {
-        $groupCombinations = $entry['groupCombinations']
-            ?? array_map(static fn (array $groups): GroupCombination => new GroupCombination($groups), $this->defaultGroupCombinations);
+        /** @var array<class-string, array{versions: list<string|int>|null, groupCombinations: list<GroupCombination>|null}> $merged */
+        $merged = [];
+        foreach ($this->plainSerializerClasses as $className) {
+            $merged[$className] = ['versions' => null, 'groupCombinations' => null];
+        }
 
-        return new ClassToGenerate(
-            $entry['className'],
-            array_map(strval(...), $entry['versions'] ?? $this->defaultVersions),
-            $groupCombinations,
-        );
+        foreach ($this->classEntries as $className => $entry) {
+            if (!$entry['target']->includesSerializer()) {
+                continue;
+            }
+
+            $merged[$className] = ['versions' => $entry['versions'], 'groupCombinations' => $entry['groupCombinations']];
+        }
+
+        $defaultGroupCombinations = array_map(static fn (array $groups): GroupCombination => new GroupCombination($groups), $this->defaultGroupCombinations);
+        $classes = [];
+        foreach ($merged as $className => $config) {
+            $classes[] = new ClassToGenerate(
+                $className,
+                array_map(strval(...), $config['versions'] ?? $this->defaultVersions),
+                $config['groupCombinations'] ?? $defaultGroupCombinations,
+            );
+        }
+
+        return $classes;
+    }
+
+    /**
+     * @return list<class-string>
+     */
+    private function resolveDeserializerClasses(): array
+    {
+        $classes = [];
+        foreach ($this->plainDeserializerClasses as $className) {
+            $classes[$className] = $className;
+        }
+
+        foreach ($this->classEntries as $className => $entry) {
+            if ($entry['target']->includesDeserializer()) {
+                $classes[$className] = $className;
+            }
+        }
+
+        return array_values($classes);
+    }
+
+    /**
+     * @param list<string> $classNames
+     *
+     * @return list<class-string>
+     */
+    private static function normalizeClassNames(array $classNames): array
+    {
+        /** @var list<class-string> $normalized */
+        $normalized = array_map(static fn (string $className): string => ltrim($className, '\\'), $classNames);
+
+        return $normalized;
+    }
+
+    /**
+     * @param list<string|int>|null $versions
+     */
+    private static function assertVersions(?array $versions): void
+    {
+        if ([] === $versions) {
+            throw new \InvalidArgumentException('Version list may not be empty. To generate without version, specify an empty string. To use the default versions, pass null.');
+        }
+    }
+
+    /**
+     * @param list<mixed>|null $groupCombinations
+     */
+    private static function assertGroupCombinations(?array $groupCombinations): void
+    {
+        if (null === $groupCombinations) {
+            return;
+        }
+        if ([] === $groupCombinations) {
+            throw new \InvalidArgumentException('Group combination list may not be empty. To generate without groups, specify a list with new GroupCombination([]). To use the default group combinations, pass null.');
+        }
+        foreach ($groupCombinations as $groupCombination) {
+            if (!$groupCombination instanceof GroupCombination) {
+                throw new \InvalidArgumentException(\sprintf('Group combinations must be instances of "%s".', GroupCombination::class));
+            }
+        }
     }
 }

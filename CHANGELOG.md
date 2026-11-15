@@ -13,11 +13,27 @@
 * Add `phpbench/phpbench` and some benchmarks
 * Improve performance of (de)serialization by adjusting the generated code a bit
 * Fix wrong serialization for hashmaps
-* Rename `GeneratorConfiguration::createFomArray()` to `createFromArray()` (typo fix)
 * Remove dead `Recursion::check()` method
 * Support JMS `Exclude(if: ...)` and `Expose(if: ...)` expressions for serialization and deserialization.
-  Enable the `expression_language` generator option and pass a Symfony `ExpressionLanguage` to the `Serializer`
-  constructor to evaluate them. Without the option, the expressions are ignored.
+  Call `withExpressionLanguage()` on the `SerializerConfig` builder to evaluate them. Without it, the expressions
+  are ignored.
+* Add the `SerializerConfig::configure($cacheDirectory)` builder. It replaces `GeneratorConfiguration::createFromArray()`.
+  Call `buildCompiler()` to get the `Compiler` and `buildSerializer()` to get the `Serializer`.
+  * `withMetadataBuilder()`, `withClasses()`, `withSerializerClasses()`, `withDeserializerClasses()`
+  * `withClass()` sets versions, group combinations and a `GenerationTarget` for one class
+  * `withDefaultVersions()` and `withDefaultGroupCombinations()` replace `default_versions` and `default_group_combinations`
+  * `withAllowGenericArrays()`, `withSerializeNull()` and `withNullAsDefault()` replace the `generation` options
+    `allow_generic_arrays`, `serialize_null` and `null_as_default`
+  * `withHandlers()`, `withEventDispatcher()` and `withExpressionLanguage()`
+  * Empty lists of versions or group combinations throw an `InvalidArgumentException`
+* BC break: remove `GeneratorConfiguration::createFromArray()` and the `symfony/options-resolver` dependency.
+  Use the `SerializerConfig` builder instead.
+* BC break: change the constructors of these classes. Use the `SerializerConfig` builder to create them.
+  * `GeneratorConfiguration` takes the classes to generate and the options as constructor arguments
+  * `ClassToGenerate` takes the class name, the versions and the group combinations. It has no reference to the
+    configuration anymore
+  * `GroupCombination` takes the groups and optional versions. It has no reference to the class anymore
+  * `DeserializerGenerator` takes the `GeneratorConfiguration` as its second argument and no list of classes
 
 # 3.x
 

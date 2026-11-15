@@ -15,8 +15,9 @@ final readonly class GeneratorConfiguration
      * @param bool                                                          $allowGenericArrays  If this is false, arrays with sub type PropertyTypeUnknown are treated as error.
      *                                                                                           If this is true, deserialize assigns the raw array and serialize just takes the raw content of the field.
      * @param list<SerializerHandlerInterface|DeserializerHandlerInterface> $handlers
-     * @param bool                                                          $serializeNull       If this is false, do not wrap conditionals around assigning fields whose value is null
-     * @param bool                                                          $nullAsDefault       If this is false, do not wrap conditionals around assigning fields whose value is null
+     * @param bool                                                          $serializeNull       If this is true, serialize fields whose value is null as null. If this is false, leave them out.
+     * @param bool                                                          $nullAsDefault       If this is true, deserialize skips an incoming null and keeps the default value of the property.
+     *                                                                                           If this is false, deserialize assigns the null.
      */
     public function __construct(
         private array $serializerClasses = [],

@@ -19,6 +19,9 @@ use Liip\Serializer\Template\Deserialization;
 use Liip\Serializer\Template\Serialization;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @phpstan-type GeneratorOptions array{allowGenericArrays?: bool, expressionLanguage?: bool, handlers?: list<SerializerHandlerInterface|DeserializerHandlerInterface>, serializeNull?: bool, nullAsDefault?: bool}
+ */
 class SerializerTestCase extends TestCase
 {
     /**
@@ -33,7 +36,7 @@ class SerializerTestCase extends TestCase
     /**
      * Generate the deserializer for the specified class and make sure the file and function exist.
      *
-     * @param array{allowGenericArrays?: bool, expressionLanguage?: bool, handlers?: list<SerializerHandlerInterface|DeserializerHandlerInterface>, serializeNull?: bool, nullAsDefault?: bool} $options
+     * @param GeneratorOptions $options
      */
     protected static function generateDeserializer(Builder $metadataBuilder, string $classToGenerate, string $functionName, array $options = []): void
     {
@@ -50,10 +53,10 @@ class SerializerTestCase extends TestCase
     }
 
     /**
-     * @param list<string>                                                                                                                                                                      $functionNames
-     * @param list<string>                                                                                                                                                                      $versions
-     * @param list<list<string>>                                                                                                                                                                $groups
-     * @param array{allowGenericArrays?: bool, expressionLanguage?: bool, handlers?: list<SerializerHandlerInterface|DeserializerHandlerInterface>, serializeNull?: bool, nullAsDefault?: bool} $options
+     * @param list<string>       $functionNames
+     * @param list<string>       $versions
+     * @param list<list<string>> $groups
+     * @param GeneratorOptions   $options
      */
     protected static function generateSerializers(Builder $metadataBuilder, string $classToGenerate, array $functionNames, array $versions = ['2'], array $groups = [[]], array $options = []): void
     {

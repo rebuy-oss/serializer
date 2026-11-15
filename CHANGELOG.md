@@ -13,15 +13,17 @@
 * Add `phpbench/phpbench` and some benchmarks
 * Improve performance of (de)serialization by adjusting the generated code a bit
 * Fix wrong serialization for hashmaps
-* Rename `GeneratorConfiguration::createFomArray()` to `createFromArray()` (typo fix)
 * Remove dead `Recursion::check()` method
 * Support JMS `Exclude(if: ...)` and `Expose(if: ...)` expressions for serialization and deserialization.
-  Enable the `expression_language` generator option and pass a Symfony `ExpressionLanguage` to the `Serializer`
-  constructor to evaluate them. Without the option, the expressions are ignored.
+  Call `withExpressionLanguage()` on the `SerializerConfigBuilder` to evaluate them. Without it, the expressions
+  are ignored.
 * Support JMS `Inline` for serialization and deserialization. Like in JMS, serialization merges the keys of an inline
   object or array into the parent, and deserialization passes the data of the parent to the inline property.
 * Fix `serialize_null` serializing a class to `[]` instead of an empty object when all its properties are omitted
   because of `SkipWhenEmpty`, `Exclude(if: ...)`/`Expose(if: ...)` or `MaxDepth`
+* BC break: configure the serializer and its compiler with the `SerializerConfigBuilder::create($cacheDirectory)` builder.
+  It replaces `GeneratorConfiguration::createFromArray()` and the `symfony/options-resolver` dependency.
+  See the README for how to use it.
 
 # 3.x
 

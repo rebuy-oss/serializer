@@ -41,43 +41,8 @@ use Liip\MetadataParser\ModelParser\JMSParser;
 use Liip\MetadataParser\ModelParser\LiipMetadataAttributeParser;
 use Liip\MetadataParser\ModelParser\PhpDocParser;
 use Liip\MetadataParser\ModelParser\ReflectionParser;
-use Liip\Serializer\DeserializerGenerator;
-use Liip\Serializer\Serializer;
-use Liip\Serializer\SerializerGenerator;
-use Liip\Serializer\Template\Deserialization;
-use Liip\Serializer\Template\Serialization;
-
-$configuration = GeneratorConfiguration::createFromArray([
-    'options' => [
-        'allow_generic_arrays' => false,
-        'expression_language' => false, // optional, default is `false`
-        'generation' => [
-            'serialization' => [
-                'serialize_null' => false // optional, default is `false`
-            ],
-        ],
-    ],
-    'default_group_combinations' => ['api'],
-    'default_versions' => ['', '1', '2'],
-    'classes' => [
-         Product::class => [
-             'default_versions' => ['1', '2'], // optional, falls back to global list
-             'group_combinations' => [ // optional, falls back to global default_group_combinations
-                 [
-                     'groups' => [], // generate without groups
-                 ],
-                 [
-                     'groups' => ['api'], // global groups are overwritten, not merged. versions are taken from class default
-                 ],
-                 [
-                     'groups' => ['api', 'detail'],
-                     'versions' => ['2'], // only generate the combination of api and detail for version 2
-                 ],
-             ],
-         ],
-         Other::class => [], // generate this class with default groups and versions
-    ]
-]);
+use Liip\Serializer\Configuration\GroupCombination;
+use Liip\Serializer\Configuration\SerializerConfigBuilder;
 
 $parsers = [
     new ReflectionParser(),
@@ -88,24 +53,48 @@ $parsers = [
 ];
 $builder = new Builder(new Parser($parsers), new RecursionChecker(null, []));
 
-$serializerGenerator = new SerializerGenerator( new Serialization(), $configuration, $cacheDirectory);
-$deserializerGenerator = new DeserializerGenerator(new Deserialization(), [Product::class, User::class], $cacheDirectory);
-$serializerGenerator->generate($builder);
-$deserializerGenerator->generate($builder);
+$config = SerializerConfigBuilder::create($cacheDirectory)
+    ->withMetadataBuilder($builder)
+    ->withClasses([Other::class], versions: ['', '1', '2'], groupCombinations: [new GroupCombination(['api'])])
+    ->withClass(
+        Product::class,
+        versions: ['1', '2'],
+        groupCombinations: [new GroupCombination(['api', 'detail'], versions: ['2'])],
+    )
+    ->withClassForSerializer(Summary::class, versions: ['2'])
+    ->withClassForDeserializer(Input::class)
+    ->withHandlers([new UuidHandler()])
+    ->withEventDispatcher($dispatcher)
+    ->withExpressionLanguage($expressionLanguage);
+
+$config->buildCompiler()->compile();
+$serializer = $config->buildSerializer();
 ```
 
-### Configuration format
+`buildCompiler()` throws an exception when you did not call `withMetadataBuilder()`.
 
-Specify global defaults for the versions to be generated, and the group 
-combinations.
+### Classes
 
-Then specify for which classes to generate the serializer and deserializer.
+Use `withClasses()` to name classes one by one. This generates the serializer and the deserializer.
+Use `withClassesForSerializer()` or `withClassesForDeserializer()` to generate only one of them.
 
-For each class, you can overwrite which versions to generate. If you specify 
-no group combinations, the global default group combinations are used. If you
-specify group combinations, you can again overwrite the versions to generate.
+Use `withClass()` to configure one class. It generates the serializer and the deserializer.
+Use `withClassForSerializer()` or `withClassForDeserializer()` to generate only one of them.
+`withClassForDeserializer()` and `withClassesForDeserializer()` take no versions and no group combinations.
 
-Note that defaults are not merged - the most specific list is used exclusively.
+A later call for the same class replaces the earlier configuration of that class. It only replaces the side that the
+call generates: `withClassForSerializer()` after `withClass()` keeps the deserializer.
+
+### Versions and groups
+
+`withClass()`, `withClasses()`, `withClassForSerializer()` and `withClassesForSerializer()` take versions and group
+combinations. If you do not give them, the library generates without version and without groups:
+`versions: ['']` and `groupCombinations: [new GroupCombination([])]`.
+
+A `GroupCombination` can overwrite the versions for one combination of groups.
+The library selects versions and group combinations for each field separately. It never merges lists.
+
+Versions and groups only affect serialization.
 
 #### Version
 
@@ -113,12 +102,25 @@ To generate a file without version, specify version `''` in the list of versions
 
 #### Groups
 
-To generate a serializer without groups, specify an empty group combination `[]`.
+To generate a serializer without groups, specify an empty group combination.
+
+Group combinations are `GroupCombination` objects:
+`new GroupCombination([])` for no groups, `new GroupCombination(['api'])` for the group `api`.
+The builder throws an exception for any other entry.
+
+The versions list and the group combinations list may not be empty.
+
+### Null values
+
+By default, the serializer leaves out fields whose value is `null`. Call `withSerializeNull()` to write them as `null`.
+
+By default, the deserializer skips an incoming `null` and keeps the default value of the property.
+Call `withNullAsDefault(false)` to assign the incoming `null` to the property.
 
 ### Arrays with an unknown type
 
 If you want to (de)serialize arrays with undefined content, you can do that by
-setting the `allow_generic_arrays` value to `true` via the `options` argument.
+calling `withAllowGenericArrays()` on the builder.
 
 Note: This will only work if the contents of that array are only primitive
 types (string, int, float, boolean and nested arrays with only these types).
@@ -206,15 +208,13 @@ class UuidHandler implements SerializerHandlerInterface, DeserializerHandlerInte
 
 #### Registering handlers
 
-You can register one or multiple handlers via the `handlers` key inside `options` when creating a `GeneratorConfiguration`:
+You can register one or multiple handlers with `withHandlers()`:
 
 ```php
-$configuration = GeneratorConfiguration::createFromArray([
-    'options' => [
-        'handlers' => [new UuidHandler()],
-    ],
+$config = SerializerConfigBuilder::create($cacheDirectory)
+    ->withHandlers([new UuidHandler()])
     // ...
-]);
+;
 ```
 
 ## Serialize using the generated code
@@ -266,8 +266,8 @@ data, you will lose the distinction between empty array and empty object.
 
 Similar to JMS Serializer, the Rebuy Serializer can dispatch events before and
 after (de-)serialization. Pass any implementation of the
-`symfony/event-dispatcher-contracts` `EventDispatcherInterface` as second
-argument to the `Serializer`. Without a dispatcher, no events are dispatched.
+`symfony/event-dispatcher-contracts` `EventDispatcherInterface` to
+`withEventDispatcher()`. Without a dispatcher, no events are dispatched.
 
 Unlike JMS, the events are only dispatched for the root object, not for nested
 objects.
@@ -286,8 +286,8 @@ In this example, we add a field to every serialized `Product`:
 
 ```php
 use Acme\Model\Product;
+use Liip\Serializer\Configuration\SerializerConfigBuilder;
 use Liip\Serializer\Event\PostSerializeEvent;
-use Liip\Serializer\Serializer;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
 $dispatcher = new EventDispatcher();
@@ -299,7 +299,9 @@ $dispatcher->addListener(PostSerializeEvent::class, static function (PostSeriali
     $event->setData([...$event->getData(), 'type' => 'product']);
 });
 
-$serializer = new Serializer($cacheDirectory, $dispatcher);
+$serializer = SerializerConfigBuilder::create($cacheDirectory)
+    ->withEventDispatcher($dispatcher)
+    ->buildSerializer();
 ```
 
 ## Expressions
@@ -313,12 +315,8 @@ Like JMS Serializer, the rebuy Serializer supports expressions in the JMS attrib
 `#[Expose(if: ...)]` on properties and in `#[Exclude(if: ...)]` on classes. To use them, install the expression
 language with `composer require symfony/expression-language`.
 
-The expressions are only added to the generated code when you set the `expression_language` option to `true`. At
-runtime, they are only evaluated when you pass an `ExpressionLanguage` as third argument to the `Serializer`.
-
-> [!WARNING]
-> Without the `expression_language` option, the expressions are silently ignored and all properties are
-> (de-)serialized, even the ones an expression should hide. Enable the option if your models use expressions.
+The expressions are only added to the generated code when you call `withExpressionLanguage()`. The same call
+makes the `Serializer` evaluate the expressions at runtime.
 
 The expressions get these variables:
 
@@ -331,26 +329,24 @@ Like in JMS, `object` is `null` when deserializing.
 
 Unlike JMS, `property_metadata` and `class_metadata` are not available.
 
-An excluded object is handled like `null`: the field is left out, or written as `null` when `serialize_null` is
-enabled. An excluded root object is serialized as an empty object and deserializes to `null`.
+An excluded object is handled like `null`: the field is left out, or written as `null` when `withSerializeNull()` is
+set. An excluded root object is serialized as an empty object and deserializes to `null`.
 
-In this example, we enable expressions for the generated files and pass an `ExpressionLanguage` to the `Serializer`:
+In this example, we enable expressions for the generated files and for the `Serializer`:
 
 ```php
-use Liip\Serializer\Configuration\GeneratorConfiguration;
-use Liip\Serializer\Serializer;
+use Liip\Serializer\Configuration\SerializerConfigBuilder;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 
-$configuration = GeneratorConfiguration::createFromArray([
-    'options' => ['expression_language' => true],
+$config = SerializerConfigBuilder::create($cacheDirectory)
+    ->withMetadataBuilder($builder)
+    ->withExpressionLanguage(new ExpressionLanguage(new ArrayAdapter(deepClone: false)))
     // ...
-]);
+;
 
-// Generate the files as described above.
-
-$expressionLanguage = new ExpressionLanguage(new ArrayAdapter(deepClone: false));
-$serializer = new Serializer($cacheDirectory, $dispatcher, $expressionLanguage);
+$config->buildCompiler()->compile();
+$serializer = $config->buildSerializer();
 ```
 
 # Where do I go for help?

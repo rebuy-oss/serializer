@@ -36,6 +36,21 @@ final class SerializerConfigBuilder
     private array $plainDeserializerClasses = [];
 
     /**
+     * @var list<array{namespace: string, directory: string, versions: list<string|int>|null, groupCombinations: list<GroupCombination>|null}>
+     */
+    private array $serializerPaths = [];
+
+    /**
+     * @var list<array{namespace: string, directory: string}>
+     */
+    private array $deserializerPaths = [];
+
+    /**
+     * @var list<string>
+     */
+    private array $skip = [];
+
+    /**
      * @var list<string|int>
      */
     private array $defaultVersions = [''];
@@ -113,6 +128,47 @@ final class SerializerConfigBuilder
         self::assertVersions($versions);
         self::assertGroupCombinations($groupCombinations);
         $this->classEntries[ltrim($className, '\\')] = ['versions' => $versions, 'groupCombinations' => $groupCombinations, 'target' => $target];
+
+        return $this;
+    }
+
+    /**
+     * @param list<string|int>|null       $versions
+     * @param list<GroupCombination>|null $groupCombinations
+     */
+    public function withPath(string $namespace, string $directory, ?array $versions = null, ?array $groupCombinations = null): static
+    {
+        $this->withSerializerPath($namespace, $directory, $versions, $groupCombinations);
+
+        return $this->withDeserializerPath($namespace, $directory);
+    }
+
+    /**
+     * @param list<string|int>|null       $versions
+     * @param list<GroupCombination>|null $groupCombinations
+     */
+    public function withSerializerPath(string $namespace, string $directory, ?array $versions = null, ?array $groupCombinations = null): static
+    {
+        self::assertVersions($versions);
+        self::assertGroupCombinations($groupCombinations);
+        $this->serializerPaths[] = ['namespace' => $namespace, 'directory' => $directory, 'versions' => $versions, 'groupCombinations' => $groupCombinations];
+
+        return $this;
+    }
+
+    public function withDeserializerPath(string $namespace, string $directory): static
+    {
+        $this->deserializerPaths[] = ['namespace' => $namespace, 'directory' => $directory];
+
+        return $this;
+    }
+
+    /**
+     * @param list<string> $skip
+     */
+    public function withSkip(array $skip): static
+    {
+        $this->skip = [...$this->skip, ...array_map(static fn (string $entry): string => str_contains($entry, '/') ? $entry : ltrim($entry, '\\'), $skip)];
 
         return $this;
     }
@@ -198,10 +254,11 @@ final class SerializerConfigBuilder
             throw new \LogicException('Call withMetadataBuilder() before buildCompiler().');
         }
 
-        $serializerClasses = $this->resolveSerializerClasses();
-        $deserializerClasses = $this->resolveDeserializerClasses();
+        $discovery = new ClassDiscovery($this->skip);
+        $serializerClasses = $this->resolveSerializerClasses($discovery);
+        $deserializerClasses = $this->resolveDeserializerClasses($discovery);
         if ([] === $serializerClasses && [] === $deserializerClasses) {
-            throw new \LogicException('No classes to generate. Add classes.');
+            throw new \LogicException('No classes to generate. Add classes or paths.');
         }
 
         $configuration = new GeneratorConfiguration(
@@ -224,12 +281,18 @@ final class SerializerConfigBuilder
     /**
      * @return list<ClassToGenerate>
      */
-    private function resolveSerializerClasses(): array
+    private function resolveSerializerClasses(ClassDiscovery $discovery): array
     {
         /** @var array<class-string, array{versions: list<string|int>|null, groupCombinations: list<GroupCombination>|null}> $merged */
         $merged = [];
+        foreach ($this->serializerPaths as $path) {
+            foreach ($discovery->discover($path['namespace'], $path['directory']) as $className) {
+                $merged[$className] = $this->mergePathConfig($className, $merged[$className] ?? null, $path);
+            }
+        }
+
         foreach ($this->plainSerializerClasses as $className) {
-            $merged[$className] = ['versions' => null, 'groupCombinations' => null];
+            $merged[$className] ??= ['versions' => null, 'groupCombinations' => null];
         }
 
         foreach ($this->classEntries as $className => $entry) {
@@ -237,7 +300,11 @@ final class SerializerConfigBuilder
                 continue;
             }
 
-            $merged[$className] = ['versions' => $entry['versions'], 'groupCombinations' => $entry['groupCombinations']];
+            $current = $merged[$className] ?? ['versions' => null, 'groupCombinations' => null];
+            $merged[$className] = [
+                'versions' => $entry['versions'] ?? $current['versions'],
+                'groupCombinations' => $entry['groupCombinations'] ?? $current['groupCombinations'],
+            ];
         }
 
         $defaultGroupCombinations = array_map(static fn (array $groups): GroupCombination => new GroupCombination($groups), $this->defaultGroupCombinations);
@@ -256,9 +323,15 @@ final class SerializerConfigBuilder
     /**
      * @return list<class-string>
      */
-    private function resolveDeserializerClasses(): array
+    private function resolveDeserializerClasses(ClassDiscovery $discovery): array
     {
         $classes = [];
+        foreach ($this->deserializerPaths as $path) {
+            foreach ($discovery->discover($path['namespace'], $path['directory']) as $className) {
+                $classes[$className] = $className;
+            }
+        }
+
         foreach ($this->plainDeserializerClasses as $className) {
             $classes[$className] = $className;
         }
@@ -270,6 +343,74 @@ final class SerializerConfigBuilder
         }
 
         return array_values($classes);
+    }
+
+    /**
+     * @param array{versions: list<string|int>|null, groupCombinations: list<GroupCombination>|null}|null                                  $current
+     * @param array{namespace: string, directory: string, versions: list<string|int>|null, groupCombinations: list<GroupCombination>|null} $path
+     *
+     * @return array{versions: list<string|int>|null, groupCombinations: list<GroupCombination>|null}
+     */
+    private function mergePathConfig(string $className, ?array $current, array $path): array
+    {
+        if (null === $current) {
+            return ['versions' => $path['versions'], 'groupCombinations' => $path['groupCombinations']];
+        }
+
+        $versions = $this->mergeField($className, $current['versions'], $path['versions'], self::versionsKey(...));
+        $groupCombinations = $this->mergeField($className, $current['groupCombinations'], $path['groupCombinations'], self::groupCombinationsKey(...));
+
+        return ['versions' => $versions, 'groupCombinations' => $groupCombinations];
+    }
+
+    /**
+     * @template T of array
+     *
+     * @param T|null                    $current
+     * @param T|null                    $new
+     * @param callable(T): list<string> $key
+     *
+     * @return T|null
+     */
+    private function mergeField(string $className, ?array $current, ?array $new, callable $key): ?array
+    {
+        if (null === $current) {
+            return $new;
+        }
+        if (null === $new || $key($current) === $key($new)) {
+            return $current;
+        }
+
+        throw new \LogicException(\sprintf('Class "%s" is found by more than one path with different versions or group combinations. Configure it with withClass().', $className));
+    }
+
+    /**
+     * @param list<string|int> $versions
+     *
+     * @return list<string>
+     */
+    private static function versionsKey(array $versions): array
+    {
+        $keys = array_map(strval(...), $versions);
+        sort($keys, \SORT_STRING);
+
+        return $keys;
+    }
+
+    /**
+     * @param list<GroupCombination> $groupCombinations
+     *
+     * @return list<string>
+     */
+    private static function groupCombinationsKey(array $groupCombinations): array
+    {
+        $keys = array_map(
+            static fn (GroupCombination $combination): string => json_encode([$combination->getGroups(), null === $combination->getVersions() ? null : self::versionsKey($combination->getVersions())], \JSON_THROW_ON_ERROR),
+            $groupCombinations,
+        );
+        sort($keys, \SORT_STRING);
+
+        return $keys;
     }
 
     /**

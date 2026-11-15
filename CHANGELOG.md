@@ -26,6 +26,8 @@
     `allow_generic_arrays`, `serialize_null` and `null_as_default`
   * `withHandlers()`, `withEventDispatcher()` and `withExpressionLanguage()`
   * Empty lists of versions or group combinations throw an `InvalidArgumentException`
+* Find classes in directories: `withPath()`, `withSerializerPath()` and `withDeserializerPath()` take a namespace
+  prefix and a directory. `withSkip()` excludes class names and path globs from this discovery.
 * BC break: remove `GeneratorConfiguration::createFromArray()` and the `symfony/options-resolver` dependency.
   Use the `SerializerConfig` builder instead.
 * BC break: change the constructors of these classes. Use the `SerializerConfig` builder to create them.

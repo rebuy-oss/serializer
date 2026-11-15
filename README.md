@@ -56,6 +56,9 @@ $builder = new Builder(new Parser($parsers), new RecursionChecker(null, []));
 
 $config = SerializerConfig::configure($cacheDirectory)
     ->withMetadataBuilder($builder)
+    ->withPath('App\\Model\\', __DIR__.'/src/Model')
+    ->withSerializerPath('App\\Api\\', __DIR__.'/src/Api', versions: ['1', '2'], groupCombinations: [new GroupCombination(['api'])])
+    ->withDeserializerPath('App\\Input\\', __DIR__.'/src/Input')
     ->withClasses([Other::class])
     ->withClass(
         Product::class,
@@ -63,6 +66,7 @@ $config = SerializerConfig::configure($cacheDirectory)
         groupCombinations: [new GroupCombination(['api', 'detail'], versions: ['2'])],
         target: GenerationTarget::Both,
     )
+    ->withSkip([Internal::class, __DIR__.'/src/Model/Internal/*'])
     ->withDefaultVersions(['', '1', '2'])
     ->withDefaultGroupCombinations([['api']])
     ->withHandlers([new UuidHandler()])
@@ -76,24 +80,47 @@ $serializer = $config->buildSerializer();
 `buildCompiler()` throws an exception when you did not call `withMetadataBuilder()`.
 It also throws an exception when there is nothing to generate.
 
-### Classes
+### Classes and paths
 
 Use `withClasses()` to name classes one by one. This generates the serializer and the deserializer.
 Use `withSerializerClasses()` or `withDeserializerClasses()` to generate only one of them.
+
+Use `withPath()` to find classes in a directory. Give a namespace prefix and a plain directory.
+The library scans the directory recursively for `*.php` files. The class name is the prefix plus the relative file path.
+The library loads each class with the autoloader. It throws an exception when a file has no matching class.
+It keeps only concrete classes. It skips interfaces, traits, enums and abstract classes.
+
+You can use the same namespace for several directories. Call `withPath()` again for each directory.
+
+`withPath()` configures the serializer and the deserializer.
+Use `withSerializerPath()` or `withDeserializerPath()` to configure only one of them.
+`withDeserializerPath()` takes no versions and no group combinations.
+
+Use `withSkip()` to exclude classes that a path finds. An entry is a class name or a path glob.
+An entry that contains `/` is a glob. A glob matches the real absolute path of the file, with symbolic links resolved.
+`*` also matches `/`. `withSkip()` does not affect classes that you name with
+`withClasses()` or `withClass()`.
+
+The library finds the classes in `buildCompiler()`. `buildSerializer()` never scans directories.
 
 ### Versions and groups
 
 Set global defaults with `withDefaultVersions()` and `withDefaultGroupCombinations()`.
 The default versions are `['']`. The default group combinations are `[[]]`.
 
+A path can overwrite the versions and group combinations of the classes it finds.
 `withClass()` can overwrite them for one class. A `GroupCombination` can also overwrite the versions
 for one combination of groups.
 
 The library selects versions and group combinations for each class and for each field separately.
-It uses this order: `withClass()`, then the global defaults.
+It uses this order: `withClass()`, then the path, then the global defaults.
 The library uses the most specific list completely. It never merges lists.
 A later `withClass()` for the same class replaces the earlier one, including its `GenerationTarget`.
 Class lists from `withClasses()` never overwrite a configuration.
+
+When two paths find the same class with different versions or group combinations, the library throws an exception.
+The library ignores the order of the entries in the lists when it compares them.
+Call `withClass()` for this class to solve the conflict.
 
 `withClass()` takes a `GenerationTarget`. Use `GenerationTarget::Serializer` or `GenerationTarget::Deserializer`
 to generate only one of them. The default is `GenerationTarget::Both`.
@@ -109,7 +136,7 @@ To generate a file without version, specify version `''` in the list of versions
 To generate a serializer without groups, specify an empty group combination.
 
 `withDefaultGroupCombinations()` takes lists of group names: `[[]]` for no groups, `[['api']]` for the group `api`.
-`withClass()` takes `GroupCombination` objects:
+`withClass()`, `withPath()` and `withSerializerPath()` take `GroupCombination` objects:
 `new GroupCombination([])` for no groups, `new GroupCombination(['api'])` for the group `api`.
 These methods throw an exception for any other entry.
 

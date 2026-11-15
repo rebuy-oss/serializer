@@ -23,11 +23,15 @@ use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Symfony\Component\Filesystem\Filesystem;
 use Tests\Liip\Serializer\Fixtures\Builder\Concrete;
 use Tests\Liip\Serializer\Fixtures\Builder\Sub\Nested;
+use Tests\Liip\Serializer\Fixtures\Discovery\Skipped\Hidden;
+use Tests\Liip\Serializer\Fixtures\Discovery\Sub\Nested as DiscoveredNested;
 use Tests\Liip\Serializer\Fixtures\ExcludeIfModel;
 
 #[Medium]
 class SerializerConfigBuilderTest extends TestCase
 {
+    private const string NS = 'Tests\Liip\Serializer\Fixtures\Discovery\\';
+
     private string $cacheDirectory;
 
     protected function setUp(): void
@@ -43,7 +47,7 @@ class SerializerConfigBuilderTest extends TestCase
     public function testBuildSerializerDoesNotNeedMetadataBuilder(): void
     {
         $serializer = SerializerConfig::configure($this->cacheDirectory)
-            ->withClasses(['Does\Not\Exist'])
+            ->withPath('Does\Not\Exist', '/does/not/exist')
             ->buildSerializer()
         ;
 
@@ -138,6 +142,103 @@ class SerializerConfigBuilderTest extends TestCase
         self::assertStringNotContainsString('expressionLanguage', (string) file_get_contents($withoutDirectory.$file));
     }
 
+    public function testPathGeneratesFoundClasses(): void
+    {
+        $this->builder()->withPath(self::NS, self::dir())->buildCompiler()->compile();
+
+        foreach (['Concrete', 'Sub_Nested', 'Skipped_Hidden'] as $name) {
+            self::assertFileExists($this->discoveredFile('serialize', $name));
+            self::assertFileExists($this->discoveredFile('deserialize', $name));
+        }
+        self::assertFileDoesNotExist($this->discoveredFile('serialize', 'AbstractModel'));
+        self::assertFileDoesNotExist($this->discoveredFile('deserialize', 'AbstractModel'));
+    }
+
+    public function testSerializerAndDeserializerPaths(): void
+    {
+        $this->builder()
+            ->withSerializerPath(self::NS.'Sub\\', self::dir().'/Sub')
+            ->withDeserializerPath(self::NS.'Skipped\\', self::dir().'/Skipped')
+            ->buildCompiler()
+            ->compile()
+        ;
+
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested'));
+        self::assertFileExists($this->discoveredFile('deserialize', 'Skipped_Hidden'));
+        self::assertFileDoesNotExist($this->discoveredFile('deserialize', 'Sub_Nested'));
+        self::assertFileDoesNotExist($this->discoveredFile('serialize', 'Skipped_Hidden'));
+    }
+
+    public function testSameNamespaceTwice(): void
+    {
+        $this->builder()
+            ->withPath(self::NS.'Sub\\', self::dir().'/Sub')
+            ->withPath(self::NS.'Skipped\\', self::dir().'/Skipped')
+            ->buildCompiler()
+            ->compile()
+        ;
+
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested'));
+        self::assertFileExists($this->discoveredFile('serialize', 'Skipped_Hidden'));
+    }
+
+    public function testSkipOnlyAppliesToPaths(): void
+    {
+        $this->builder()
+            ->withPath(self::NS, self::dir())
+            ->withSkip([Hidden::class])
+            ->withClasses([Hidden::class])
+            ->buildCompiler()
+            ->compile()
+        ;
+        self::assertFileExists($this->discoveredFile('serialize', 'Skipped_Hidden'));
+
+        $this->builder('/without-class')
+            ->withPath(self::NS, self::dir())
+            ->withSkip([Hidden::class])
+            ->buildCompiler()
+            ->compile()
+        ;
+        self::assertFileDoesNotExist($this->cacheDirectory.'/without-class/serialize_Tests_Liip_Serializer_Fixtures_Discovery_Skipped_Hidden.php');
+        self::assertFileExists($this->cacheDirectory.'/without-class/serialize_Tests_Liip_Serializer_Fixtures_Discovery_Concrete.php');
+    }
+
+    public function testPathConfig(): void
+    {
+        $this->builder()
+            ->withPath(self::NS.'Sub\\', self::dir().'/Sub', versions: ['1'], groupCombinations: [new GroupCombination(['api'])])
+            ->buildCompiler()
+            ->compile()
+        ;
+
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested_api_1'));
+    }
+
+    public function testWithClassWinsOverPath(): void
+    {
+        $this->builder()
+            ->withPath(self::NS.'Sub\\', self::dir().'/Sub', versions: ['1'], groupCombinations: [new GroupCombination(['api'])])
+            ->withClass(DiscoveredNested::class, versions: ['2'])
+            ->buildCompiler()
+            ->compile()
+        ;
+
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested_api_2'));
+        self::assertFileDoesNotExist($this->discoveredFile('serialize', 'Sub_Nested_api_1'));
+    }
+
+    public function testWithClassesKeepsPathConfig(): void
+    {
+        $this->builder()
+            ->withPath(self::NS.'Sub\\', self::dir().'/Sub', versions: ['1'])
+            ->withClasses([DiscoveredNested::class])
+            ->buildCompiler()
+            ->compile()
+        ;
+
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested_1'));
+    }
+
     public function testLaterWithClassReplacesEarlier(): void
     {
         $this->builder()
@@ -179,6 +280,18 @@ class SerializerConfigBuilderTest extends TestCase
         self::assertFileDoesNotExist($this->file('serialize', 'Concrete'));
     }
 
+    public function testOverlappingPathsWithEqualConfigDoNotThrow(): void
+    {
+        $this->builder()
+            ->withPath(self::NS, self::dir(), versions: ['2'])
+            ->withPath(self::NS.'Sub\\', self::dir().'/Sub', versions: ['2'])
+            ->buildCompiler()
+            ->compile()
+        ;
+
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested_2'));
+    }
+
     public function testWithClassTarget(): void
     {
         $this->builder()
@@ -189,6 +302,31 @@ class SerializerConfigBuilderTest extends TestCase
 
         self::assertFileExists($this->file('serialize', 'Concrete'));
         self::assertFileDoesNotExist($this->file('deserialize', 'Concrete'));
+    }
+
+    public function testConflictingPathsThrow(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Sub\Nested');
+
+        $this->builder()
+            ->withPath(self::NS, self::dir(), versions: ['1'])
+            ->withPath(self::NS.'Sub\\', self::dir().'/Sub', versions: ['2'])
+            ->buildCompiler()
+        ;
+    }
+
+    public function testOverlappingPathsWithoutConflict(): void
+    {
+        $this->builder()
+            ->withPath(self::NS, self::dir())
+            ->withPath(self::NS.'Sub\\', self::dir().'/Sub', versions: ['2'])
+            ->buildCompiler()
+            ->compile()
+        ;
+
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested_2'));
+        self::assertFileDoesNotExist($this->discoveredFile('serialize', 'Sub_Nested'));
     }
 
     public function testLaterWithClassReplacesTarget(): void
@@ -217,12 +355,40 @@ class SerializerConfigBuilderTest extends TestCase
         self::assertFileExists($this->file('deserialize', 'Concrete'));
     }
 
+    public function testPathConflictIgnoresOrderOfVersions(): void
+    {
+        $this->builder()
+            ->withPath(self::NS, self::dir(), versions: ['1', '2'])
+            ->withPath(self::NS.'Sub\\', self::dir().'/Sub', versions: [2, 1])
+            ->buildCompiler()
+            ->compile()
+        ;
+
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested_1'));
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested_2'));
+    }
+
+    public function testPathConflictIgnoresOrderOfGroupCombinations(): void
+    {
+        $this->builder()
+            ->withPath(self::NS, self::dir(), groupCombinations: [new GroupCombination(['api']), new GroupCombination([])])
+            ->withPath(self::NS.'Sub\\', self::dir().'/Sub', groupCombinations: [new GroupCombination([]), new GroupCombination(['api'])])
+            ->buildCompiler()
+            ->compile()
+        ;
+
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested_api'));
+        self::assertFileExists($this->discoveredFile('serialize', 'Sub_Nested'));
+    }
+
     public function testLeadingBackslashOfClassNamesIsIgnored(): void
     {
         $this->builder()
             ->withClass('\\'.Concrete::class, versions: ['1'])
             ->withClass(Concrete::class, versions: ['2'])
             ->withSerializerClasses(['\\'.Nested::class])
+            ->withSkip(['\\'.Hidden::class])
+            ->withPath(self::NS.'Skipped\\', self::dir().'/Skipped')
             ->buildCompiler()
             ->compile()
         ;
@@ -230,6 +396,7 @@ class SerializerConfigBuilderTest extends TestCase
         self::assertFileExists($this->file('serialize', 'Concrete_2'));
         self::assertFileDoesNotExist($this->file('serialize', 'Concrete_1'));
         self::assertFileExists($this->file('serialize', 'Sub_Nested'));
+        self::assertFileDoesNotExist($this->discoveredFile('serialize', 'Skipped_Hidden'));
     }
 
     /**
@@ -252,7 +419,13 @@ class SerializerConfigBuilderTest extends TestCase
         yield 'empty default group combinations' => [static fn (SerializerConfigBuilder $b): SerializerConfigBuilder => $b->withDefaultGroupCombinations([])];
         yield 'empty class versions' => [static fn (SerializerConfigBuilder $b): SerializerConfigBuilder => $b->withClass(Concrete::class, versions: [])];
         yield 'empty class group combinations' => [static fn (SerializerConfigBuilder $b): SerializerConfigBuilder => $b->withClass(Concrete::class, groupCombinations: [])];
+        yield 'empty path versions' => [static fn (SerializerConfigBuilder $b): SerializerConfigBuilder => $b->withPath(self::NS, '/x', versions: [])];
+        yield 'empty path group combinations' => [static fn (SerializerConfigBuilder $b): SerializerConfigBuilder => $b->withPath(self::NS, '/x', groupCombinations: [])];
+        yield 'empty serializer path versions' => [static fn (SerializerConfigBuilder $b): SerializerConfigBuilder => $b->withSerializerPath(self::NS, '/x', versions: [])];
+        yield 'empty serializer path group combinations' => [static fn (SerializerConfigBuilder $b): SerializerConfigBuilder => $b->withSerializerPath(self::NS, '/x', groupCombinations: [])];
         yield 'class group combinations without objects' => [static fn (SerializerConfigBuilder $b): SerializerConfigBuilder => $b->withClass(Concrete::class, groupCombinations: [[]])];
+        yield 'path group combinations without objects' => [static fn (SerializerConfigBuilder $b): SerializerConfigBuilder => $b->withPath(self::NS, '/x', groupCombinations: [['api']])];
+        yield 'serializer path group combinations without objects' => [static fn (SerializerConfigBuilder $b): SerializerConfigBuilder => $b->withSerializerPath(self::NS, '/x', groupCombinations: [['api']])];
     }
 
     public function testListMethodsAppend(): void
@@ -292,6 +465,16 @@ class SerializerConfigBuilderTest extends TestCase
     private function file(string $type, string $name): string
     {
         return $this->cacheDirectory.'/'.$type.'_Tests_Liip_Serializer_Fixtures_Builder_'.$name.'.php';
+    }
+
+    private function discoveredFile(string $type, string $name): string
+    {
+        return $this->cacheDirectory.'/'.$type.'_Tests_Liip_Serializer_Fixtures_Discovery_'.$name.'.php';
+    }
+
+    private static function dir(): string
+    {
+        return \dirname(__DIR__, 2).'/Fixtures/Discovery';
     }
 
     private static function createMetadataBuilder(): Builder

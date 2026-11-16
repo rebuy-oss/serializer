@@ -33,11 +33,11 @@ class SerializerTestCase extends TestCase
     {
         $templating = new Deserialization();
         $configuration = GeneratorConfiguration::createFromArray(['classes' => [$classToGenerate => []], 'options' => $options]);
-        $deserializerGenerator = new DeserializerGenerator($templating, [], '/tmp', $configuration);
+        $deserializerGenerator = new DeserializerGenerator($templating, [], static::getGeneratedDir(), $configuration);
 
         $deserializerGenerator->generate($metadataBuilder);
 
-        $filePath = '/tmp/'.$functionName.'.php';
+        $filePath = static::getGeneratedDir().'/'.$functionName.'.php';
         self::assertFileExists($filePath);
         require_once $filePath;
         self::assertTrue(\function_exists($functionName));
@@ -54,15 +54,20 @@ class SerializerTestCase extends TestCase
             ],
             'options' => $options,
         ]);
-        $serializerGenerator = new SerializerGenerator($templating, $configuration, '/tmp');
+        $serializerGenerator = new SerializerGenerator($templating, $configuration, static::getGeneratedDir());
 
         $serializerGenerator->generate($metadataBuilder);
 
         foreach ($functionNames as $functionName) {
-            $filePath = '/tmp/'.$functionName.'.php';
+            $filePath = static::getGeneratedDir().'/'.$functionName.'.php';
             self::assertFileExists($filePath);
             require_once $filePath;
             self::assertTrue(\function_exists($functionName));
         }
+    }
+
+    protected static function getGeneratedDir(): string
+    {
+        return __DIR__.'/../generated';
     }
 }

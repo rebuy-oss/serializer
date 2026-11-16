@@ -286,7 +286,7 @@ class DeserializerGeneratorTest extends SerializerTestCase
     public function testNonEmptyConstructorRoot(): void
     {
         $templating = new Deserialization();
-        $deserializerGenerator = new DeserializerGenerator($templating, [NonEmptyConstructor::class], '/tmp');
+        $deserializerGenerator = new DeserializerGenerator($templating, [NonEmptyConstructor::class], static::getGeneratedDir());
 
         $this->expectExceptionMessage('We currently do not support deserializing when the root class has a non-empty constructor');
         $deserializerGenerator->generate(static::$metadataBuilder);

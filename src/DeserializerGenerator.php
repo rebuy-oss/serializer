@@ -138,7 +138,7 @@ final readonly class DeserializerGenerator
         $code = '';
         foreach ($classMetadata->getProperties() as $propertyMetadata) {
             $propertyType = $propertyMetadata->getType();
-            $propertyArrayPath = $arrayPath->withFieldName($propertyMetadata->getSerializedName());
+            $propertyArrayPath = $propertyMetadata->isInline() ? $arrayPath : $arrayPath->withFieldName($propertyMetadata->getSerializedName());
 
             if ($classMetadata->hasConstructorParameter($propertyMetadata->getName())) {
                 $argument = $classMetadata->getConstructorParameter($propertyMetadata->getName());
@@ -150,7 +150,9 @@ final readonly class DeserializerGenerator
                 $constructorArgumentNames[$propertyMetadata->getName()] = (string) $tempVariable;
                 $getValue = $this->generateInnerCodeForFieldType($propertyType, $propertyArrayPath, $tempVariable, $stack);
 
-                if ($this->configuration->shouldTreatNullAsDefault()) {
+                if ($propertyMetadata->isInline()) {
+                    $argumentCode = $this->templating->renderArgument((string) $tempVariable, $default, $getValue);
+                } elseif ($this->configuration->shouldTreatNullAsDefault()) {
                     $argumentCode = $this->templating->renderArgument(
                         (string) $tempVariable,
                         $default,
@@ -269,6 +271,10 @@ final readonly class DeserializerGenerator
         ModelPath $modelPath,
         array $stack,
     ): string {
+        if ($propertyMetadata->isInline()) {
+            return $this->generateCodeForInlinePropertyValue($propertyMetadata, $arrayPath, $modelPath, $stack);
+        }
+
         /** @var non-empty-list<ArrayEntry> $arrayPathLastKey */
         [$arrayPathBase, $arrayPathLastKey] = $arrayPath->splitBack();
         $arrayPathLastKey = array_pop($arrayPathLastKey)->getPath();
@@ -325,6 +331,32 @@ final readonly class DeserializerGenerator
             (string) $arrayPathLastKey,
             $this->templating->renderIsNotNullConditional((string) $arrayPath, $deserializeValue, $setNull)
         );
+    }
+
+    /**
+     * @param array<string, positive-int> $stack
+     */
+    private function generateCodeForInlinePropertyValue(
+        PropertyMetadata $propertyMetadata,
+        ArrayPath $arrayPath,
+        ModelPath $modelPath,
+        array $stack,
+    ): string {
+        $propertyType = $propertyMetadata->getType();
+        if (!$propertyMetadata->getAccessor()->hasSetterMethod()) {
+            return $this->generateInnerCodeForFieldType($propertyType, $arrayPath, $modelPath->withPath($propertyMetadata->getName()), $stack);
+        }
+
+        $tempVariable = ModelPath::tempVariable([(string) $modelPath, $propertyMetadata->getName()]);
+        $getValue = $this->generateInnerCodeForFieldType($propertyType, $arrayPath, $tempVariable, $stack);
+        $setIntoModel = $this->templating->renderSetter((string) $modelPath, $propertyMetadata->getAccessor()->getSetterMethod(), (string) $tempVariable);
+        if (!$this->exclusionResolver->typeMayBeExcluded($propertyType)) {
+            return $getValue.$setIntoModel;
+        }
+
+        $setIntoModel = $this->templating->renderIsNotNullConditional("({$tempVariable} ?? null)", $setIntoModel, null);
+
+        return $this->templating->renderUnset([(string) $tempVariable]).$getValue.$setIntoModel;
     }
 
     /**

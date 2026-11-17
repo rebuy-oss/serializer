@@ -295,7 +295,7 @@ class SerializerTest extends SerializerTestCase
         $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_MultidimensionalArrayForPrimitive';
         self::generateSerializers(self::$metadataBuilder, MultidimensionalArrayForPrimitive::class, [$functionName], ['']);
 
-        $serializer = new Serializer('/tmp');
+        $serializer = new Serializer(static::getGeneratedDir());
 
         $subject = new MultidimensionalArrayForPrimitive();
         $twoDims = [0 => [0], 1 => [1]];
@@ -317,7 +317,7 @@ class SerializerTest extends SerializerTestCase
     {
         self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, ['serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel'], [''], options: ['expression_language' => true]);
         self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel', ['expression_language' => true]);
-        $serializer = new Serializer('/tmp');
+        $serializer = new Serializer(static::getGeneratedDir());
 
         $json = $serializer->serialize(self::createExcludeIfModel(), 'json', new Context());
         $expected = '{"name":"","serialize_only":"serialize","without_context_only":"without context","children":[],"child_map":{}}';
@@ -332,7 +332,7 @@ class SerializerTest extends SerializerTestCase
     {
         self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, ['serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel'], [''], options: ['expression_language' => true]);
         self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel', ['expression_language' => true]);
-        $serializer = new Serializer('/tmp', expressionLanguage: new ExpressionLanguage());
+        $serializer = new Serializer(static::getGeneratedDir(), expressionLanguage: new ExpressionLanguage());
 
         $json = $serializer->serialize(self::createExcludeIfModel(), 'json');
         $expected = '{"name":"","serialize_only":"serialize","without_context_only":"without context","children":[],"child_map":{}}';

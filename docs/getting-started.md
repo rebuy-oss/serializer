@@ -64,12 +64,16 @@ If you configure a class again, the new call replaces the earlier configuration,
 generates. For example, `withClassForSerializer()` after `withClass()` replaces the serializer configuration and keeps
 the deserializer.
 
-### Null values
+### Null and empty values
 
 By default, the serializer leaves out fields whose value is `null`. Call `withSerializeNull()` to write them as `null`.
 
 By default, the deserializer skips an incoming `null` and keeps the default value of the property.
 Call `withNullAsDefault(false)` to assign the incoming `null` to the property.
+
+#### SkipWhenEmpty
+
+`SkipWhenEmpty` skips a property when it is `null`, an empty array or an empty `Countable` (e.g. a Doctrine `Collection`). Unlike JMS, an object that serializes to no properties is still written as an empty object.
 
 ### Arrays with an unknown type
 

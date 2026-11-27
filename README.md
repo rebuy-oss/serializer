@@ -92,7 +92,7 @@ methods are ignored. Custom JMS handlers, listeners and similar extensions do no
 | `VirtualProperty`               | ✅         | –           |                                                                    |
 | `ReadOnlyProperty`              | ✅         | –           |                                                                    |
 | `Groups`, `Since`, `Until`      | ✅         | ❌           | See [Versions and groups](docs/versions-and-groups.md)             |
-| `SkipWhenEmpty`                 | ⚠️        | –           | See [Limitations](docs/limitations.md#skipwhenempty)               |
+| `SkipWhenEmpty`                 | ⚠️        | –           | See [SkipWhenEmpty](docs/getting-started.md#skipwhenempty)         |
 | `Inline`                        | ✅         | ✅           | Not for scalar types                                               |
 | `MaxDepth`                      | ✅         | ✅           |                                                                    |
 | `Discriminator`                 | ✅         | ✅           |                                                                    |

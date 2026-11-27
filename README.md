@@ -3,9 +3,11 @@
 > [!NOTE]
 > This project is based on the original work of [liip/serializer](https://github.com/liip/serializer). This repository is the actively maintained continuation of that project.
 
-The Rebuy Serializer converts between JSON and PHP objects. It supports JSON only. It uses reflection, Phpdoc and
-[JMS Serializer](https://github.com/schmittjoh/serializer/) attributes to generate PHP code for the conversion. The
-generated code is simple and specific to your models, which makes it fast even for very large object trees.
+A JSON (de-)serializer for PHP that generates its code ahead of time.
+
+- **Generated, not interpreted:** one plain PHP file per model, version and group combination
+- **JMS compatible:** reuses your existing [JMS Serializer](https://github.com/schmittjoh/serializer/) attributes, with a [drop-in adapter](#drop-in-replacement-for-jms-serializer) if you need it
+- **Fast at scale:** built for object trees with megabytes of JSON
 
 ## Contents
 
@@ -13,6 +15,7 @@ generated code is simple and specific to your models, which makes it fast even f
 
 - [Installation](#installation)
 - [Quickstart](#quickstart)
+- [Supported JMS features](#supported-jms-features)
 - [Drop-in replacement for JMS Serializer](#drop-in-replacement-for-jms-serializer)
 - [Help](#help)
 
@@ -67,6 +70,48 @@ $product = $serializer->deserialize($json, Product::class, 'json');
 ```
 
 See [Getting started](docs/getting-started.md) for all options.
+
+## Supported JMS features
+
+The generation fails when a class or property uses a JMS attribute that is not supported. Unsupported attributes on
+methods are ignored. Custom JMS handlers, listeners and similar extensions do not work. See [Limitations](docs/limitations.md).
+
+✅ supported, ⚠️ supported with differences, ❌ not supported, – not applicable
+
+### Attributes
+
+| Feature                         | Serialize | Deserialize | Notes                                                              |
+|---------------------------------|-----------|-------------|--------------------------------------------------------------------|
+| `Type`                          | ✅         | ✅           |                                                                    |
+| `SerializedName`                | ✅         | ✅           |                                                                    |
+| `Exclude`                       | ✅         | ✅           | Not on classes without `if`                                        |
+| `Expose`, `ExclusionPolicy`     | ✅         | ✅           |                                                                    |
+| `Exclude(if)`, `Expose(if)`     | ✅         | ✅           | See [Expressions](docs/expressions.md)                             |
+| `Accessor`                      | ✅         | ✅           |                                                                    |
+| `AccessorOrder`                 | ✅         | –           |                                                                    |
+| `VirtualProperty`               | ✅         | –           |                                                                    |
+| `ReadOnlyProperty`              | ✅         | –           |                                                                    |
+| `Groups`, `Since`, `Until`      | ✅         | ❌           | See [Versions and groups](docs/versions-and-groups.md)             |
+| `SkipWhenEmpty`                 | ⚠️        | –           | See [Limitations](docs/limitations.md#skipwhenempty)               |
+| `Inline`                        | ✅         | ✅           | Not for scalar types                                               |
+| `MaxDepth`                      | ✅         | ✅           |                                                                    |
+| `Discriminator`                 | ✅         | ✅           |                                                                    |
+| `UnionDiscriminator`            | ✅         | ✅           | Required to deserialize unions of non-primitive types              |
+| `PostDeserialize`               | –         | ✅           |                                                                    |
+| `PreSerialize`, `PostSerialize` | ❌         | –           | Ignored. Use [Events](docs/events.md)                              |
+| `HandlerCallback`               | ❌         | ❌           | Ignored. Use [Handlers](docs/handlers.md)                          |
+| `AccessType`                    | ❌         | ❌           | Generation fails                                                   |
+| Any other JMS attribute         | ❌         | ❌           | Generation fails on classes and properties, ignored on methods     |
+
+### Runtime features
+
+| Feature                     | Serialize | Deserialize | Notes                                            |
+|-----------------------------|-----------|-------------|--------------------------------------------------|
+| Custom handlers             | ❌         | ❌           | Use [Handlers](docs/handlers.md)                 |
+| Event subscribers           | ❌         | ❌           | Use [Events](docs/events.md)                     |
+| Custom exclusion strategies | ❌         | ❌           |                                                  |
+| Context attributes          | ❌         | ❌           | The `Context` only holds groups and the version  |
+| `serializeNull`             | ⚠️        | –           | Set once with `withSerializeNull()`              |
 
 ## Drop-in replacement for JMS Serializer
 

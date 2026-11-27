@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php-version: ['8.4', '8.5']
+        php-version: ['8.4', '8.5', '8.6']
         include:
           - php-version: '8.4'
             composer-flags: '--prefer-stable --prefer-lowest'

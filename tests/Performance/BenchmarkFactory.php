@@ -12,12 +12,10 @@ use Liip\MetadataParser\ModelParser\PhpDocParser;
 use Liip\MetadataParser\ModelParser\ReflectionParser;
 use Liip\MetadataParser\Parser;
 use Liip\MetadataParser\RecursionChecker;
-use Liip\Serializer\Configuration\GeneratorConfiguration;
-use Liip\Serializer\DeserializerGenerator;
+use Liip\Serializer\Configuration\SerializerConfigBuilder;
 use Liip\Serializer\Serializer;
-use Liip\Serializer\SerializerGenerator;
-use Liip\Serializer\Template\Deserialization;
-use Liip\Serializer\Template\Serialization;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
 use Tests\Liip\Serializer\Fixtures\ExcludeIfChild;
 use Tests\Liip\Serializer\Fixtures\ExcludeIfModel;
 use Tests\Liip\Serializer\Fixtures\ListModel;
@@ -48,18 +46,13 @@ final class BenchmarkFactory
             new RecursionChecker(null, []),
         );
 
-        $configuration = GeneratorConfiguration::createFromArray([
-            'default_group_combinations' => [[]],
-            'default_versions' => [''],
-            'classes' => [
-                ListModel::class => [],
-                ExcludeIfModel::class => [],
-            ],
-            'options' => ['expression_language' => true],
-        ]);
-
-        new SerializerGenerator(new Serialization(), $configuration, $cacheDir)->generate($builder);
-        new DeserializerGenerator(new Deserialization(), [], $cacheDir, $configuration)->generate($builder);
+        SerializerConfigBuilder::create($cacheDir)
+            ->withMetadataBuilder($builder)
+            ->withClasses([ListModel::class, ExcludeIfModel::class])
+            ->withExpressionLanguage(new ExpressionLanguage(new ArrayAdapter(deepClone: false)))
+            ->buildCompiler()
+            ->compile()
+        ;
     }
 
     public static function createSerializer(): Serializer

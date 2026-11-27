@@ -315,8 +315,8 @@ class SerializerTest extends SerializerTestCase
 
     public function testExcludeIfIsIgnoredWithoutExpressionLanguage(): void
     {
-        self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, ['serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel'], [''], options: ['expression_language' => true]);
-        self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel', ['expression_language' => true]);
+        self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, ['serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel'], [''], options: ['expressionLanguage' => true]);
+        self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel', ['expressionLanguage' => true]);
         $serializer = new Serializer(static::getGeneratedDir());
 
         $json = $serializer->serialize(self::createExcludeIfModel(), 'json', new Context());
@@ -330,8 +330,8 @@ class SerializerTest extends SerializerTestCase
 
     public function testExcludeIf(): void
     {
-        self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, ['serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel'], [''], options: ['expression_language' => true]);
-        self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel', ['expression_language' => true]);
+        self::generateSerializers(self::$metadataBuilder, ExcludeIfModel::class, ['serialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel'], [''], options: ['expressionLanguage' => true]);
+        self::generateDeserializer(self::$metadataBuilder, ExcludeIfModel::class, 'deserialize_Tests_Liip_Serializer_Fixtures_ExcludeIfModel', ['expressionLanguage' => true]);
         $serializer = new Serializer(static::getGeneratedDir(), expressionLanguage: new ExpressionLanguage());
 
         $json = $serializer->serialize(self::createExcludeIfModel(), 'json');

@@ -11,6 +11,9 @@ use Liip\MetadataParser\Builder;
 use Liip\MetadataParser\ModelParser\JMSParser;
 use Liip\MetadataParser\ModelParser\PhpDocParser;
 use Liip\MetadataParser\ModelParser\ReflectionParser;
+use Liip\Serializer\Configuration\ClassToGenerate;
+use Liip\Serializer\Configuration\GeneratorConfiguration;
+use Liip\Serializer\Configuration\GroupCombination;
 use Liip\Serializer\Context;
 use Liip\Serializer\DeserializerGenerator;
 use Liip\Serializer\Template\Deserialization;
@@ -57,7 +60,7 @@ use Tests\Liip\Serializer\Fixtures\VirtualProperties;
 #[Medium]
 class DeserializerGeneratorTest extends SerializerTestCase
 {
-    private const array WITH_EXPRESSIONS = ['expression_language' => true];
+    private const array WITH_EXPRESSIONS = ['expressionLanguage' => true];
 
     private static Builder $metadataBuilder;
 
@@ -138,9 +141,7 @@ class DeserializerGeneratorTest extends SerializerTestCase
         $alias = InlineModel::class.($nullAsDefault ? 'NullAsDefault' : 'NullNotAsDefault');
         $functionName = DeserializerGenerator::buildDeserializerFunctionName($alias);
         class_alias(InlineModel::class, $alias);
-        self::generateDeserializer(self::$metadataBuilder, $alias, $functionName, [
-            'generation' => ['deserialization' => ['null_as_default' => $nullAsDefault]],
-        ]);
+        self::generateDeserializer(self::$metadataBuilder, $alias, $functionName, ['nullAsDefault' => $nullAsDefault]);
 
         $input = [
             'name' => 'root',
@@ -286,7 +287,7 @@ class DeserializerGeneratorTest extends SerializerTestCase
     public function testNonEmptyConstructorRoot(): void
     {
         $templating = new Deserialization();
-        $deserializerGenerator = new DeserializerGenerator($templating, [NonEmptyConstructor::class], static::getGeneratedDir());
+        $deserializerGenerator = new DeserializerGenerator($templating, new GeneratorConfiguration(deserializerClasses: [new ClassToGenerate(NonEmptyConstructor::class, [''], [new GroupCombination([])])]), static::getGeneratedDir());
 
         $this->expectExceptionMessage('We currently do not support deserializing when the root class has a non-empty constructor');
         $deserializerGenerator->generate(static::$metadataBuilder);
@@ -412,7 +413,7 @@ class DeserializerGeneratorTest extends SerializerTestCase
     public function testPrimitiveUnionDiscriminator(mixed $propertyValue): void
     {
         $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_PrimitiveUnionTyping';
-        self::generateDeserializer(self::$metadataBuilder, PrimitiveUnionTyping::class, $functionName, ['allow_generic_arrays' => true]);
+        self::generateDeserializer(self::$metadataBuilder, PrimitiveUnionTyping::class, $functionName, ['allowGenericArrays' => true]);
 
         $input = ['property' => $propertyValue];
         $model = $functionName($input);
@@ -437,7 +438,7 @@ class DeserializerGeneratorTest extends SerializerTestCase
         $this->expectExceptionMessage('Non primitive union types without a UnionDiscriminator for the Tests\Liip\Serializer\Fixtures\PrimitiveClassUnionTyping::classUnion property are not supported for de-serialization.');
 
         $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_PrimitiveUnionTyping';
-        self::generateDeserializer(self::$metadataBuilder, PrimitiveClassUnionTyping::class, $functionName, ['allow_generic_arrays' => true]);
+        self::generateDeserializer(self::$metadataBuilder, PrimitiveClassUnionTyping::class, $functionName, ['allowGenericArrays' => true]);
     }
 
     public function testPostDeserialize(): void
@@ -508,7 +509,7 @@ class DeserializerGeneratorTest extends SerializerTestCase
     public function testArraysWithUnknownSubType(): void
     {
         $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_UnknownArraySubType';
-        self::generateDeserializer(self::$metadataBuilder, UnknownArraySubType::class, $functionName, ['allow_generic_arrays' => true]);
+        self::generateDeserializer(self::$metadataBuilder, UnknownArraySubType::class, $functionName, ['allowGenericArrays' => true]);
 
         $unknownSubtype = ['unknown' => 'type', 'nested' => ['unknown' => 'subtype']];
         $input = [
@@ -553,9 +554,7 @@ class DeserializerGeneratorTest extends SerializerTestCase
     public function testNullsAreNotLeftOut(): void
     {
         $functionName = 'deserialize_Tests_Liip_Serializer_Fixtures_DefaultValues';
-        self::generateDeserializer(self::$metadataBuilder, DefaultValues::class, $functionName, ['generation' => [
-            'deserialization' => ['null_as_default' => false],
-        ]]);
+        self::generateDeserializer(self::$metadataBuilder, DefaultValues::class, $functionName, ['nullAsDefault' => false]);
 
         $input = [
             'list' => null,
@@ -646,8 +645,8 @@ class DeserializerGeneratorTest extends SerializerTestCase
         $functionName = DeserializerGenerator::buildDeserializerFunctionName($alias);
         class_alias(ExcludeIfDeserializationModel::class, $alias);
         self::generateDeserializer(self::$metadataBuilder, $alias, $functionName, [
-            'expression_language' => true,
-            'generation' => ['deserialization' => ['null_as_default' => $nullAsDefault]],
+            'expressionLanguage' => true,
+            'nullAsDefault' => $nullAsDefault,
         ]);
         $input = [
             'name' => 'root',
@@ -677,8 +676,8 @@ class DeserializerGeneratorTest extends SerializerTestCase
         $functionName = DeserializerGenerator::buildDeserializerFunctionName($alias);
         class_alias(ExcludeIfConstructorModel::class, $alias);
         self::generateDeserializer(self::$metadataBuilder, $alias, $functionName, [
-            'expression_language' => true,
-            'generation' => ['deserialization' => ['null_as_default' => $nullAsDefault]],
+            'expressionLanguage' => true,
+            'nullAsDefault' => $nullAsDefault,
         ]);
         $input = ['arguments' => ['excluded' => 'value', 'child' => ['name' => 'child']]];
 
@@ -733,8 +732,8 @@ class DeserializerGeneratorTest extends SerializerTestCase
         $functionName = DeserializerGenerator::buildDeserializerFunctionName($alias);
         class_alias(ExcludeIfDiscriminatorModel::class, $alias);
         self::generateDeserializer(self::$metadataBuilder, $alias, $functionName, [
-            'expression_language' => true,
-            'generation' => ['deserialization' => ['null_as_default' => $nullAsDefault]],
+            'expressionLanguage' => true,
+            'nullAsDefault' => $nullAsDefault,
         ]);
         $input = [
             'parents' => [

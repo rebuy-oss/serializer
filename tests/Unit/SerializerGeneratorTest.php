@@ -927,8 +927,8 @@ class SerializerGeneratorTest extends SerializerTestCase
             self::$metadataBuilder,
             ModelWithCustomType::class,
             [$functionName],
-            [],
-            [],
+            [''],
+            [[]],
             ['handlers' => [new CustomTypeHandler()]]
         );
 

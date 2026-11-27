@@ -1,4 +1,4 @@
-Rebuy Serializer is the result of the work of many people who made the code, the documentation and anything around it better. 
+rebuy Serializer is the result of the work of many people who made the code, the documentation and anything around it better. 
 
 Thank you for your work.
 

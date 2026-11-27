@@ -139,6 +139,11 @@ EOT;
 
 EOT;
 
+    private const string TMPL_METHOD_CALL = <<<'EOT'
+{{modelPath}}->{{method}}();
+
+EOT;
+
     private const string TMPL_GETTER = '{{modelPath}}->{{method}}()';
 
     private const string TMPL_DATETIME = '{{propertyPath}}{{ nullable ? "?" : "" }}->format({{format}})';
@@ -286,6 +291,14 @@ EOT;
     {
         return $this->render(self::TMPL_HASHMAP_EMPTY, [
             'target' => $target,
+        ]);
+    }
+
+    public function renderMethodCall(string|ModelPath $modelPath, string $method): string
+    {
+        return $this->render(self::TMPL_METHOD_CALL, [
+            'modelPath' => $modelPath,
+            'method' => $method,
         ]);
     }
 

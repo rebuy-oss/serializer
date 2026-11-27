@@ -98,7 +98,7 @@ methods are ignored. Custom JMS handlers, listeners and similar extensions do no
 | `Discriminator`                 | ✅         | ✅           |                                                                    |
 | `UnionDiscriminator`            | ✅         | ✅           | Required to deserialize unions of non-primitive types              |
 | `PostDeserialize`               | –         | ✅           |                                                                    |
-| `PreSerialize`, `PostSerialize` | ❌         | –           | Ignored. Use [Events](docs/events.md)                              |
+| `PreSerialize`, `PostSerialize` | ✅         | –           | Called on every serialized object, also with handlers              |
 | `HandlerCallback`               | ❌         | ❌           | Ignored. Use [Handlers](docs/handlers.md)                          |
 | `AccessType`                    | ❌         | ❌           | Generation fails                                                   |
 | Any other JMS attribute         | ❌         | ❌           | Generation fails on classes and properties, ignored on methods     |

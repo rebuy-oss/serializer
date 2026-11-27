@@ -128,7 +128,9 @@ final readonly class SerializerGenerator
         $className = $classMetadata->getClassName();
         $handler = $this->configuration->findSerializerHandlerForClass($className);
         if (null !== $handler) {
-            return $this->templating->renderAssign($target, $handler->generateSerializeExpression($className, "{$modelPath}"));
+            $code = $this->templating->renderAssign($target, $handler->generateSerializeExpression($className, "{$modelPath}"));
+
+            return $this->generateCodeWithSerializeMethodCalls($classMetadata, $modelPath, $code);
         }
 
         $discriminatorMetadata = $classMetadata->getDiscriminatorMetadata();
@@ -177,12 +179,34 @@ final readonly class SerializerGenerator
             $code .= $this->generateCodeForField($propertyMetadata, $nestedTarget, $modelPath, $stack, $depth);
         }
 
-        $built = $this->templating->renderClass($nestedTarget, $code, initialValues: $initialValues, withEmptyObject: $this->mightBeEmpty($classMetadata, $stack));
+        $classCode = $this->templating->renderClass($nestedTarget, $code, initialValues: $initialValues, withEmptyObject: $this->mightBeEmpty($classMetadata, $stack));
+        $built = $this->generateCodeWithSerializeMethodCalls($classMetadata, $modelPath, $classCode);
         if (!$isRootLevel) {
             $built .= $this->templating->renderAssign($target, "{$nestedTarget}");
         }
 
         return $this->generateCodeForClassExclusion($classMetadata, $target, $modelPath, $built, $isRootLevel);
+    }
+
+    private function generateCodeWithSerializeMethodCalls(ClassMetadata $classMetadata, ModelPath $modelPath, string $code): string
+    {
+        $preCode = $this->generateCodeForMethodCalls($modelPath, $classMetadata->getPreSerializeMethods());
+        $postCode = $this->generateCodeForMethodCalls($modelPath, $classMetadata->getPostSerializeMethods());
+
+        return $preCode.$code.$postCode;
+    }
+
+    /**
+     * @param string[] $methods
+     */
+    private function generateCodeForMethodCalls(ModelPath $modelPath, array $methods): string
+    {
+        $code = '';
+        foreach ($methods as $method) {
+            $code .= $this->templating->renderMethodCall($modelPath, $method);
+        }
+
+        return $code;
     }
 
     /**

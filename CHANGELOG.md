@@ -24,6 +24,8 @@
 * BC break: configure the serializer and its compiler with the `SerializerConfigBuilder::create($cacheDirectory)` builder.
   It replaces `GeneratorConfiguration::createFromArray()` and the `symfony/options-resolver` dependency.
   See the README for how to use it.
+* Support JMS `PreSerialize` and `PostSerialize`. The methods are called on every serialized object, also on objects
+  that a custom handler serializes. Excluded objects get no calls.
 
 # 3.x
 

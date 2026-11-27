@@ -40,10 +40,15 @@ use Tests\Liip\Serializer\Fixtures\ListOfModel;
 use Tests\Liip\Serializer\Fixtures\Model;
 use Tests\Liip\Serializer\Fixtures\ModelWithAnnotations;
 use Tests\Liip\Serializer\Fixtures\ModelWithCustomType;
+use Tests\Liip\Serializer\Fixtures\ModelWithPrePostSerializeCustomType;
 use Tests\Liip\Serializer\Fixtures\MultidimensionalArrayForPrimitive;
 use Tests\Liip\Serializer\Fixtures\Nested;
 use Tests\Liip\Serializer\Fixtures\OptionalKeysModel;
 use Tests\Liip\Serializer\Fixtures\PostDeserialize;
+use Tests\Liip\Serializer\Fixtures\PrePostSerialize;
+use Tests\Liip\Serializer\Fixtures\PrePostSerializeCustomType;
+use Tests\Liip\Serializer\Fixtures\PrePostSerializeCustomTypeHandler;
+use Tests\Liip\Serializer\Fixtures\PrePostSerializeNested;
 use Tests\Liip\Serializer\Fixtures\PrimitiveClassUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrimitiveUnionTyping;
 use Tests\Liip\Serializer\Fixtures\PrivateProperty;
@@ -806,6 +811,42 @@ class SerializerGeneratorTest extends SerializerTestCase
 
         self::assertSame($expected, $data);
         self::assertNull($model->postCalled);
+    }
+
+    public function testPrePostSerialize(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_PrePostSerialize_2';
+        self::generateSerializers(self::$metadataBuilder, PrePostSerialize::class, [$functionName]);
+
+        $model = new PrePostSerialize();
+        $model->nested = new PrePostSerializeNested();
+
+        $data = $functionName($model);
+
+        self::assertSame(['nested' => ['value' => 'nested'], 'value' => 'value'], $data);
+        self::assertSame(['preSerialize', 'getValue', 'postSerialize'], $model->calls);
+        self::assertSame(['preSerialize', 'getValue', 'postSerialize'], $model->nested->calls);
+    }
+
+    public function testPrePostSerializeWithHandler(): void
+    {
+        $functionName = 'serialize_Tests_Liip_Serializer_Fixtures_ModelWithPrePostSerializeCustomType';
+        self::generateSerializers(
+            self::$metadataBuilder,
+            ModelWithPrePostSerializeCustomType::class,
+            [$functionName],
+            [''],
+            [[]],
+            ['handlers' => [new PrePostSerializeCustomTypeHandler()]]
+        );
+
+        $model = new ModelWithPrePostSerializeCustomType();
+        $model->value = new PrePostSerializeCustomType();
+
+        $data = $functionName($model);
+
+        self::assertSame(['value' => 'value'], $data);
+        self::assertSame(['preSerialize', 'handler', 'postSerialize'], $model->value->calls);
     }
 
     public function testAccessorOrder(): void

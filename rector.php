@@ -10,7 +10,6 @@ use Rector\TypeDeclaration\Rector\ClassMethod\AddMethodCallBasedStrictParamTypeR
 use Rector\TypeDeclaration\Rector\ClassMethod\AddParamTypeFromPropertyTypeRector;
 use Rector\TypeDeclaration\Rector\ClassMethod\BoolReturnTypeFromBooleanStrictReturnsRector;
 use Rector\TypeDeclaration\Rector\ClassMethod\NumericReturnTypeFromStrictScalarReturnsRector;
-use Rector\TypeDeclaration\Rector\ClassMethod\ParamTypeByMethodCallTypeRector;
 use Rector\TypeDeclaration\Rector\ClassMethod\ReturnTypeFromStrictConstantReturnRector;
 use Rector\TypeDeclaration\Rector\ClassMethod\ReturnTypeFromStrictNativeCallRector;
 use Rector\TypeDeclaration\Rector\ClassMethod\ReturnTypeFromStrictNewArrayRector;
@@ -39,7 +38,6 @@ return static function (RectorConfig $rectorConfig): void {
         TypedPropertyFromStrictSetUpRector::class,
         AddMethodCallBasedStrictParamTypeRector::class,
 
-        ParamTypeByMethodCallTypeRector::class,
         AddParamTypeFromPropertyTypeRector::class,
     ]);
 
